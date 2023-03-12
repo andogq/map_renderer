@@ -1,12 +1,12 @@
-use osmpbf::{Element, ElementReader};
-use piet::{
-    kurbo::{PathEl, Point},
-    Color, LineCap, RenderContext, StrokeStyle,
-};
-use piet_common::{Brush, Device};
+mod renderable;
+
+use osmpbf::{Element, ElementReader, TagIter};
+use piet::{kurbo::PathEl, Color, LineCap, RenderContext};
+use piet_common::Device;
+use renderable::{DashStyle, Point, Renderable, Stroke, StrokeStyle};
 use std::{collections::HashMap, f64::consts::PI, mem};
 
-const SIZE: usize = 500;
+const SIZE: usize = 5000;
 const SCALE: usize = 8;
 
 #[derive(Debug)]
@@ -53,20 +53,193 @@ struct Way {
     pub nodes: Vec<i64>,
 }
 
+trait WayType {
+    fn get_renderables(&self, points: &[Point]) -> Vec<Renderable>;
+}
+
+// https://wiki.openstreetmap.org/wiki/Key:highway?uselang=en-GB
+enum Highway {
+    Motorway,
+    Trunk,
+    Primary,
+    Secondary,
+    Tertiary,
+    Unclassified,
+    Residential,
+    Service,
+    Footway,
+    Path,
+    Cycleway,
+    Other,
+}
+
+struct HighwayStyle {
+    color: Color,
+    width: f64,
+    stroke_style: StrokeStyle,
+}
+
+impl Highway {
+    pub fn from_tags(tags: &HashMap<String, String>) -> Option<Highway> {
+        tags.get("highway").map(|tag| match tag.as_str() {
+            "tertiary" => Highway::Tertiary,
+            "residential" => Highway::Residential,
+            "service" => Highway::Service,
+            "footway" => Highway::Footway,
+            "path" => Highway::Path,
+            "cycleway" => Highway::Cycleway,
+            _ => Highway::Other,
+        })
+    }
+}
+
+struct Park;
+
+struct Building;
+impl WayType for Building {
+    fn get_renderables(&self, points: &[Point]) -> Vec<Renderable> {
+        vec![Renderable::from_points(points).with_fill(Color::GRAY)]
+    }
+}
+
+struct Railway;
+impl WayType for Railway {
+    fn get_renderables(&self, points: &[Point]) -> Vec<Renderable> {
+        let color = Color::rgb8(164, 214, 255);
+
+        vec![
+            Renderable::from_points(points).with_stroke(Stroke {
+                width: 1.0,
+                color,
+                style: StrokeStyle::Solid,
+            }),
+            Renderable::from_points(points).with_stroke(Stroke {
+                width: 0.05,
+                color,
+                style: StrokeStyle::Dashed(DashStyle::Custom(&[0.1, 2.0])),
+            }),
+        ]
+    }
+}
+
+trait DrawableFeature {
+    fn draw(&self, ctx: &mut impl RenderContext, points: &[Point]);
+}
+
+impl WayType for Highway {
+    fn get_renderables(&self, points: &[Point]) -> Vec<Renderable> {
+        vec![Renderable::from_points(points).with_stroke({
+            let width = match self {
+                Self::Motorway => 4.0,
+                Self::Trunk | Self::Primary | Self::Secondary | Self::Tertiary => 2.0,
+                Self::Service => 0.75,
+                Self::Footway | Self::Path => 0.5,
+                _ => 1.0,
+            };
+            let color = match self {
+                Self::Motorway => Color::rgb8(223, 46, 107),
+                Self::Trunk => Color::rgb8(234, 144, 161),
+                Self::Primary => Color::rgb8(252, 192, 171),
+                Self::Secondary => Color::rgb8(253, 214, 1),
+                Self::Tertiary => Color::rgb8(246, 250, 187),
+                Self::Footway | Self::Path => Color::rgb8(250, 164, 156),
+                _ => Color::rgb8(169, 175, 182),
+            };
+            let style = match self {
+                Self::Footway | Self::Path => StrokeStyle::Dashed(renderable::DashStyle::Dot),
+                Self::Motorway | Self::Trunk | Self::Primary | Self::Secondary | Self::Tertiary => {
+                    StrokeStyle::Doubled {
+                        outer_width: 0.5,
+                        outer_color: Color::BLACK,
+                    }
+                }
+                _ => StrokeStyle::Solid,
+            };
+
+            Stroke {
+                width,
+                color,
+                style,
+            }
+        })]
+    }
+}
+
+impl WayType for Park {
+    fn get_renderables(&self, points: &[Point]) -> Vec<Renderable> {
+        vec![Renderable::from_points(points)
+            .with_stroke(Stroke {
+                width: 1.0,
+                color: Color::rgb8(122, 175, 117),
+                style: StrokeStyle::Solid,
+            })
+            .with_fill(Color::rgb8(205, 247, 201))]
+    }
+}
+
+impl Way {
+    // pub fn get_way_type(&self) -> Option<Box<impl DrawableFeature>> {
+    //     if self.tags.contains_key("highway") {
+    //         return Some(Box::new(Highway::from_tags(&self.tags).unwrap()));
+    //     // } else if self.tags.contains_key("building") {
+    //     //     return Some(WayType::Building);
+    //     } else if self
+    //         .tags
+    //         .get("leisure")
+    //         .filter(|&ty| ty == "park")
+    //         .is_some()
+    //     {
+    //         // return Some(Box::new(Park));
+    //         // } else if self.tags.contains_key("railway") {
+    //         //     return Some(WayType::Railway);
+    //     }
+    //
+    //     None
+    // }
+
+    pub fn get_way_type(&self) -> Option<Box<dyn WayType>> {
+        if self.tags.contains_key("highway") {
+            return Some(Box::new(Highway::from_tags(&self.tags).unwrap()));
+        } else if self
+            .tags
+            .get("leisure")
+            .filter(|&ty| ty == "park")
+            .is_some()
+        {
+            return Some(Box::new(Park));
+        } else if self.tags.contains_key("railway") {
+            return Some(Box::new(Railway));
+        } else if self.tags.contains_key("building") {
+            return Some(Box::new(Building));
+        }
+
+        None
+    }
+}
+
 struct Node {
     pub x: f64,
     pub y: f64,
+    pub tags: HashMap<String, String>,
 }
 
 impl Node {
     pub fn new(x: f64, y: f64) -> Node {
-        Node { x, y }
+        Node {
+            x,
+            y,
+            tags: HashMap::new(),
+        }
     }
 
     pub fn from_lon_lat(lon: f64, lat: f64) -> Node {
         let x = lon;
         let y = f64::ln(f64::tan((PI / 4.0) + (lat / 2.0)));
-        Node { x, y }
+        Node {
+            x,
+            y,
+            tags: HashMap::new(),
+        }
     }
 }
 
@@ -79,8 +252,13 @@ impl From<Node> for piet::kurbo::Point {
     }
 }
 
+fn convert_tags(iter: TagIter) -> HashMap<String, String> {
+    iter.map(|(key, value)| (key.to_string(), value.to_string()))
+        .collect()
+}
+
 fn main() -> osmpbf::Result<()> {
-    let reader = ElementReader::from_path("data/map.osm.pbf").expect("data/map.osm.pbf to exist");
+    let reader = ElementReader::from_path("data/cbd.osm.pbf").expect("data/cbd.osm.pbf to exist");
 
     let mut nodes: HashMap<i64, Node> = HashMap::new();
     let mut ways: HashMap<i64, Way> = HashMap::new();
@@ -89,33 +267,49 @@ fn main() -> osmpbf::Result<()> {
     let mut bounding: Option<Bounding> = None;
 
     reader.for_each(|element| {
-        let node = match element {
-            Element::Node(node) => Some((node.id(), Node::from_lon_lat(node.lon(), node.lat()))),
-            Element::DenseNode(node) => {
-                Some((node.id(), Node::from_lon_lat(node.lon(), node.lat())))
+        match element {
+            Element::Node(_) | Element::DenseNode(_) => {
+                let (id, node) = match element {
+                    Element::Node(node) => (node.id(), Node::from_lon_lat(node.lon(), node.lat())),
+                    Element::DenseNode(node) => {
+                        (node.id(), Node::from_lon_lat(node.lon(), node.lat()))
+                    }
+                    _ => unreachable!("can only match to node or dense node"),
+                };
+
+                // Check the node bounding
+                bounding = Some(if let Some(bounding) = &bounding {
+                    Bounding {
+                        min_x: bounding.min_x.min(node.x),
+                        min_y: bounding.min_y.min(node.y),
+                        max_x: bounding.max_x.max(node.x),
+                        max_y: bounding.max_y.max(node.y),
+                    }
+                } else {
+                    Bounding {
+                        min_x: node.x,
+                        min_y: node.y,
+                        max_x: node.x,
+                        max_y: node.y,
+                    }
+                });
+
+                nodes.insert(id, node);
             }
             Element::Way(way) => {
                 ways.insert(
                     way.id(),
                     Way {
-                        tags: way
-                            .tags()
-                            .map(|(key, value)| (key.to_string(), value.to_string()))
-                            .collect(),
+                        tags: convert_tags(way.tags()),
                         nodes: way.refs().collect(),
                     },
                 );
-
-                None
             }
             Element::Relation(relation) => {
                 relations.insert(
                     relation.id(),
                     Relation {
-                        tags: relation
-                            .tags()
-                            .map(|(key, value)| (key.to_string(), value.to_string()))
-                            .collect(),
+                        tags: convert_tags(relation.tags()),
                         members: relation
                             .members()
                             .map(|member| RelationMember {
@@ -126,35 +320,11 @@ fn main() -> osmpbf::Result<()> {
                             .collect(),
                     },
                 );
-
-                None
             }
         };
-
-        if let Some((id, node)) = node {
-            // Check the node bounding
-            bounding = Some(if let Some(bounding) = &bounding {
-                Bounding {
-                    min_x: bounding.min_x.min(node.x),
-                    min_y: bounding.min_y.min(node.y),
-                    max_x: bounding.max_x.max(node.x),
-                    max_y: bounding.max_y.max(node.y),
-                }
-            } else {
-                Bounding {
-                    min_x: node.x,
-                    min_y: node.y,
-                    max_x: node.x,
-                    max_y: node.y,
-                }
-            });
-
-            nodes.insert(id, node);
-        }
     })?;
 
     let bounding = bounding.unwrap();
-
     let d_lat = bounding.max_y - bounding.min_y;
     let d_lon = bounding.max_x - bounding.min_x;
     let scaling = f64::max(d_lat, d_lon);
@@ -168,8 +338,8 @@ fn main() -> osmpbf::Result<()> {
     ctx.clear(None, Color::WHITE);
 
     for (_way_id, way) in ways.iter() {
-        if way.tags.keys().any(|key| key == "highway") {
-            let mut points = way
+        if let Some(way_type) = way.get_way_type() {
+            let points = way
                 .nodes
                 .iter()
                 .filter_map(|node_id| nodes.get(node_id))
@@ -178,43 +348,33 @@ fn main() -> osmpbf::Result<()> {
                     let y = (1.0 - (node.y - bounding.min_y) / scaling) * (SIZE as f64);
 
                     Point::new(x, y)
-                });
+                })
+                .collect::<Vec<_>>();
 
-            let path = &[
-                &[PathEl::MoveTo(points.next().unwrap())],
-                &points.map(PathEl::LineTo).collect::<Vec<_>>()[..],
-            ]
-            .concat();
+            for renderable in way_type.get_renderables(&points) {
+                let mut points = renderable.path.into_iter().map(|p| p.into());
 
-            let highway_type = way.tags.get("highway").unwrap();
+                let path = &[
+                    &[PathEl::MoveTo(points.next().unwrap())],
+                    &points.map(PathEl::LineTo).collect::<Vec<_>>()[..],
+                ]
+                .concat();
 
-            ctx.stroke_styled(
-                &path[..],
-                &match highway_type.as_str() {
-                    "tertiary" => Color::OLIVE,
-                    "residential" => Color::RED,
-                    "service" => Color::PURPLE,
-                    "footway" => Color::BLUE,
-                    "path" => Color::LIME,
-                    "cycleway" => Color::YELLOW,
-                    _ => Color::BLACK,
-                },
-                0.5,
-                &StrokeStyle::new()
-                    .line_join(piet::LineJoin::Round)
-                    .line_cap(LineCap::Round),
-            );
+                if let Some(fill) = renderable.fill {
+                    ctx.fill(&path[..], &fill);
+                }
+
+                if let Some(stroke) = renderable.stroke {
+                    ctx.stroke_styled(
+                        &path[..],
+                        &stroke.color,
+                        stroke.width,
+                        &stroke.get_piet_stroke_style(),
+                    );
+                }
+            }
         }
     }
-
-    println!("{} nodes found", nodes.len());
-    println!(
-        "{:#?}",
-        relations
-            .iter()
-            .map(|(id, rel)| (id, &rel.tags))
-            .collect::<Vec<_>>()
-    );
 
     ctx.finish().unwrap();
     mem::drop(ctx);
