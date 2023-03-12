@@ -2,6 +2,7 @@ mod objects;
 mod osm;
 mod renderable;
 
+use clap::Parser;
 use osm::Osm;
 use osmpbf::ElementReader;
 use piet::{kurbo::PathEl, Color, RenderContext};
@@ -9,8 +10,22 @@ use piet_common::Device;
 use renderable::Point;
 use std::mem;
 
-const SIZE: usize = 500;
-const SCALE: usize = 8;
+#[derive(Parser)]
+struct Args {
+    /// Open Street Data PBF data file
+    pbf_file: String,
+
+    /// File to output png to
+    output: String,
+
+    /// Height and width of output in pixels
+    #[arg(long, default_value_t = 500)]
+    size: usize,
+
+    /// Scaling of image
+    #[arg(long, default_value_t = 2)]
+    scale: usize,
+}
 
 #[derive(Debug)]
 struct Bounding {
@@ -21,7 +36,9 @@ struct Bounding {
 }
 
 fn main() -> osmpbf::Result<()> {
-    let reader = ElementReader::from_path("data/cbd.osm.pbf").expect("data/cbd.osm.pbf to exist");
+    let args = Args::parse();
+
+    let reader = ElementReader::from_path(&args.pbf_file).expect("input file should exist");
     let osm_data = Osm::from_reader(reader)?;
 
     let bounding = osm_data
@@ -52,21 +69,25 @@ fn main() -> osmpbf::Result<()> {
 
     let mut device = Device::new().unwrap();
     let mut bitmap = device
-        .bitmap_target(SIZE * SCALE, SIZE * SCALE, SCALE as f64)
+        .bitmap_target(
+            args.size * args.scale,
+            args.size * args.scale,
+            args.scale as f64,
+        )
         .unwrap();
     let mut ctx = bitmap.render_context();
 
     ctx.clear(None, Color::WHITE);
 
     for (_way_id, way) in osm_data.ways.iter() {
-        if let Some(way_type) = way.get_way_type() {
+        if let Some(way_type) = way.to_object() {
             let points = way
                 .nodes
                 .iter()
                 .filter_map(|node_id| osm_data.nodes.get(node_id))
                 .map(|node| {
-                    let x = ((node.x - bounding.min_x) / scaling) * (SIZE as f64);
-                    let y = (1.0 - (node.y - bounding.min_y) / scaling) * (SIZE as f64);
+                    let x = ((node.x - bounding.min_x) / scaling) * (args.size as f64);
+                    let y = (1.0 - (node.y - bounding.min_y) / scaling) * (args.size as f64);
 
                     Point::new(x, y)
                 })
@@ -99,7 +120,7 @@ fn main() -> osmpbf::Result<()> {
 
     ctx.finish().unwrap();
     mem::drop(ctx);
-    bitmap.save_to_file("output.png").unwrap();
+    bitmap.save_to_file(args.output).unwrap();
 
     Ok(())
 }

@@ -8,7 +8,7 @@ pub struct Way {
 }
 
 impl Way {
-    pub fn get_way_type(&self) -> Option<Box<dyn Object>> {
+    pub fn to_object(&self) -> Option<Box<dyn Object>> {
         if self.tags.contains("highway") {
             return Some(Box::new(Highway::from_tags(&self.tags).unwrap()));
         } else if self
