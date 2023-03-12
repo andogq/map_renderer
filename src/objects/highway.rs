@@ -1,5 +1,8 @@
 use super::Object;
-use crate::renderable::{DashStyle, Point, Renderable, Stroke, StrokeStyle};
+use crate::{
+    osm::Tags,
+    renderable::{DashStyle, Point, Renderable, Stroke, StrokeStyle},
+};
 use piet::Color;
 use std::collections::HashMap;
 
@@ -20,7 +23,7 @@ pub enum Highway {
 }
 
 impl Highway {
-    pub fn from_tags(tags: &HashMap<String, String>) -> Option<Highway> {
+    pub fn from_tags(tags: &Tags) -> Option<Highway> {
         tags.get("highway").map(|tag| match tag.as_str() {
             "tertiary" => Highway::Tertiary,
             "residential" => Highway::Residential,
