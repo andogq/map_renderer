@@ -1,12 +1,14 @@
+mod objects;
 mod renderable;
 
+use objects::{Building, Highway, Object, Park, Railway};
 use osmpbf::{Element, ElementReader, TagIter};
-use piet::{kurbo::PathEl, Color, LineCap, RenderContext};
+use piet::{kurbo::PathEl, Color, RenderContext};
 use piet_common::Device;
-use renderable::{DashStyle, Point, Renderable, Stroke, StrokeStyle};
+use renderable::{Point};
 use std::{collections::HashMap, f64::consts::PI, mem};
 
-const SIZE: usize = 5000;
+const SIZE: usize = 500;
 const SCALE: usize = 8;
 
 #[derive(Debug)]
@@ -53,151 +55,8 @@ struct Way {
     pub nodes: Vec<i64>,
 }
 
-trait WayType {
-    fn get_renderables(&self, points: &[Point]) -> Vec<Renderable>;
-}
-
-// https://wiki.openstreetmap.org/wiki/Key:highway?uselang=en-GB
-enum Highway {
-    Motorway,
-    Trunk,
-    Primary,
-    Secondary,
-    Tertiary,
-    Unclassified,
-    Residential,
-    Service,
-    Footway,
-    Path,
-    Cycleway,
-    Other,
-}
-
-struct HighwayStyle {
-    color: Color,
-    width: f64,
-    stroke_style: StrokeStyle,
-}
-
-impl Highway {
-    pub fn from_tags(tags: &HashMap<String, String>) -> Option<Highway> {
-        tags.get("highway").map(|tag| match tag.as_str() {
-            "tertiary" => Highway::Tertiary,
-            "residential" => Highway::Residential,
-            "service" => Highway::Service,
-            "footway" => Highway::Footway,
-            "path" => Highway::Path,
-            "cycleway" => Highway::Cycleway,
-            _ => Highway::Other,
-        })
-    }
-}
-
-struct Park;
-
-struct Building;
-impl WayType for Building {
-    fn get_renderables(&self, points: &[Point]) -> Vec<Renderable> {
-        vec![Renderable::from_points(points).with_fill(Color::GRAY)]
-    }
-}
-
-struct Railway;
-impl WayType for Railway {
-    fn get_renderables(&self, points: &[Point]) -> Vec<Renderable> {
-        let color = Color::rgb8(164, 214, 255);
-
-        vec![
-            Renderable::from_points(points).with_stroke(Stroke {
-                width: 1.0,
-                color,
-                style: StrokeStyle::Solid,
-            }),
-            Renderable::from_points(points).with_stroke(Stroke {
-                width: 0.05,
-                color,
-                style: StrokeStyle::Dashed(DashStyle::Custom(&[0.1, 2.0])),
-            }),
-        ]
-    }
-}
-
-trait DrawableFeature {
-    fn draw(&self, ctx: &mut impl RenderContext, points: &[Point]);
-}
-
-impl WayType for Highway {
-    fn get_renderables(&self, points: &[Point]) -> Vec<Renderable> {
-        vec![Renderable::from_points(points).with_stroke({
-            let width = match self {
-                Self::Motorway => 4.0,
-                Self::Trunk | Self::Primary | Self::Secondary | Self::Tertiary => 2.0,
-                Self::Service => 0.75,
-                Self::Footway | Self::Path => 0.5,
-                _ => 1.0,
-            };
-            let color = match self {
-                Self::Motorway => Color::rgb8(223, 46, 107),
-                Self::Trunk => Color::rgb8(234, 144, 161),
-                Self::Primary => Color::rgb8(252, 192, 171),
-                Self::Secondary => Color::rgb8(253, 214, 1),
-                Self::Tertiary => Color::rgb8(246, 250, 187),
-                Self::Footway | Self::Path => Color::rgb8(250, 164, 156),
-                _ => Color::rgb8(169, 175, 182),
-            };
-            let style = match self {
-                Self::Footway | Self::Path => StrokeStyle::Dashed(renderable::DashStyle::Dot),
-                Self::Motorway | Self::Trunk | Self::Primary | Self::Secondary | Self::Tertiary => {
-                    StrokeStyle::Doubled {
-                        outer_width: 0.5,
-                        outer_color: Color::BLACK,
-                    }
-                }
-                _ => StrokeStyle::Solid,
-            };
-
-            Stroke {
-                width,
-                color,
-                style,
-            }
-        })]
-    }
-}
-
-impl WayType for Park {
-    fn get_renderables(&self, points: &[Point]) -> Vec<Renderable> {
-        vec![Renderable::from_points(points)
-            .with_stroke(Stroke {
-                width: 1.0,
-                color: Color::rgb8(122, 175, 117),
-                style: StrokeStyle::Solid,
-            })
-            .with_fill(Color::rgb8(205, 247, 201))]
-    }
-}
-
 impl Way {
-    // pub fn get_way_type(&self) -> Option<Box<impl DrawableFeature>> {
-    //     if self.tags.contains_key("highway") {
-    //         return Some(Box::new(Highway::from_tags(&self.tags).unwrap()));
-    //     // } else if self.tags.contains_key("building") {
-    //     //     return Some(WayType::Building);
-    //     } else if self
-    //         .tags
-    //         .get("leisure")
-    //         .filter(|&ty| ty == "park")
-    //         .is_some()
-    //     {
-    //         // return Some(Box::new(Park));
-    //         // } else if self.tags.contains_key("railway") {
-    //         //     return Some(WayType::Railway);
-    //     }
-    //
-    //     None
-    // }
-
-    pub fn get_way_type(&self) -> Option<Box<dyn WayType>> {
+    pub fn get_way_type(&self) -> Option<Box<dyn Object>> {
         if self.tags.contains_key("highway") {
             return Some(Box::new(Highway::from_tags(&self.tags).unwrap()));
         } else if self
