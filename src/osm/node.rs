@@ -9,6 +9,7 @@ pub struct Node {
 }
 
 impl Node {
+    #[allow(dead_code)]
     pub fn new(x: f64, y: f64) -> Node {
         Node {
             x,

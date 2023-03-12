@@ -4,9 +4,9 @@ use crate::{
     renderable::{DashStyle, Point, Renderable, Stroke, StrokeStyle},
 };
 use piet::Color;
-use std::collections::HashMap;
 
 // https://wiki.openstreetmap.org/wiki/Key:highway?uselang=en-GB
+#[allow(dead_code)]
 pub enum Highway {
     Motorway,
     Trunk,

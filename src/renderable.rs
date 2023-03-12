@@ -21,6 +21,7 @@ impl From<Point> for piet::kurbo::Point {
     }
 }
 
+#[allow(dead_code)]
 pub enum DashStyle {
     Even,
     Dot,
@@ -83,7 +84,7 @@ pub struct Renderable {
 impl Renderable {
     pub fn from_points(points: &[Point]) -> Self {
         Self {
-            path: points.iter().cloned().collect(),
+            path: points.to_vec(),
             stroke: None,
             fill: None,
         }
