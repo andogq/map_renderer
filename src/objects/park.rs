@@ -1,5 +1,5 @@
 use super::Object;
-use crate::renderable::{Color, Point, Renderable, Stroke, StrokeStyle};
+use crate::renderer::{Color, Point, Renderable, Stroke, StrokeStyle};
 
 pub struct Park;
 

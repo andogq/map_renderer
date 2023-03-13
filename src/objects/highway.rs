@@ -1,7 +1,7 @@
 use super::Object;
 use crate::{
     osm::Tags,
-    renderable::{Color, DashStyle, Point, Renderable, Stroke, StrokeStyle},
+    renderer::{Color, DashStyle, Point, Renderable, Stroke, StrokeStyle},
 };
 
 // https://wiki.openstreetmap.org/wiki/Key:highway?uselang=en-GB

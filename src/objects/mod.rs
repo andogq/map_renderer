@@ -3,7 +3,7 @@ mod highway;
 mod park;
 mod railway;
 
-use crate::renderable::{Point, Renderable};
+use crate::renderer::{Point, Renderable};
 
 pub use building::Building;
 pub use highway::Highway;

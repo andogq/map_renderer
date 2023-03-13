@@ -1,5 +1,5 @@
 use super::Object;
-use crate::renderable::{Color, DashStyle, Point, Renderable, Stroke, StrokeStyle};
+use crate::renderer::{Color, DashStyle, Point, Renderable, Stroke, StrokeStyle};
 
 pub struct Railway;
 

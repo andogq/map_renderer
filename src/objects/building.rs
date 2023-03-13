@@ -1,5 +1,5 @@
 use super::Object;
-use crate::renderable::{Point, Renderable, Color};
+use crate::renderer::{Color, Point, Renderable};
 
 pub struct Building;
 
