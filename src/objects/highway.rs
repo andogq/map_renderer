@@ -1,9 +1,8 @@
 use super::Object;
 use crate::{
     osm::Tags,
-    renderable::{DashStyle, Point, Renderable, Stroke, StrokeStyle},
+    renderable::{Color, DashStyle, Point, Renderable, Stroke, StrokeStyle},
 };
-use piet::Color;
 
 // https://wiki.openstreetmap.org/wiki/Key:highway?uselang=en-GB
 #[allow(dead_code)]
@@ -47,20 +46,20 @@ impl Object for Highway {
                 _ => 1.0,
             };
             let color = match self {
-                Self::Motorway => Color::rgb8(223, 46, 107),
-                Self::Trunk => Color::rgb8(234, 144, 161),
-                Self::Primary => Color::rgb8(252, 192, 171),
-                Self::Secondary => Color::rgb8(253, 214, 1),
-                Self::Tertiary => Color::rgb8(246, 250, 187),
-                Self::Footway | Self::Path => Color::rgb8(250, 164, 156),
-                _ => Color::rgb8(169, 175, 182),
+                Self::Motorway => Color::new(223, 46, 107),
+                Self::Trunk => Color::new(234, 144, 161),
+                Self::Primary => Color::new(252, 192, 171),
+                Self::Secondary => Color::new(253, 214, 1),
+                Self::Tertiary => Color::new(246, 250, 187),
+                Self::Footway | Self::Path => Color::new(250, 164, 156),
+                _ => Color::new(169, 175, 182),
             };
             let style = match self {
                 Self::Footway | Self::Path => StrokeStyle::Dashed(DashStyle::Dot),
                 Self::Motorway | Self::Trunk | Self::Primary | Self::Secondary | Self::Tertiary => {
                     StrokeStyle::Doubled {
                         outer_width: 0.5,
-                        outer_color: Color::BLACK,
+                        outer_color: Color::new(0, 0, 0),
                     }
                 }
                 _ => StrokeStyle::Solid,

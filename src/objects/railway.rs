@@ -1,12 +1,11 @@
 use super::Object;
-use crate::renderable::{DashStyle, Point, Renderable, Stroke, StrokeStyle};
-use piet::Color;
+use crate::renderable::{Color, DashStyle, Point, Renderable, Stroke, StrokeStyle};
 
 pub struct Railway;
 
 impl Object for Railway {
     fn get_renderables(&self, points: &[Point]) -> Vec<Renderable> {
-        let color = Color::rgb8(164, 214, 255);
+        let color = Color::new(164, 214, 255);
 
         vec![
             Renderable::from_points(points).with_stroke(Stroke {
@@ -17,7 +16,7 @@ impl Object for Railway {
             Renderable::from_points(points).with_stroke(Stroke {
                 width: 0.05,
                 color,
-                style: StrokeStyle::Dashed(DashStyle::Custom(&[0.1, 2.0])),
+                style: StrokeStyle::Dashed(DashStyle::Custom(vec![0.1, 2.0])),
             }),
         ]
     }

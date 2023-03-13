@@ -8,7 +8,6 @@ edition = "2021"
 [dependencies]
 clap = { version = "4.1.8", features = ["derive"] }
 osmpbf = "0.3.0"
-piet = { version = "0.6.2", features = ["png"] }
-piet-common = { version = "0.6.2", features = ["png"] }
-piet-coregraphics = "0.6.2"
 raqote = "0.8.2"
+softbuffer = "0.2.0"
+winit = "0.28.2"

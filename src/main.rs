@@ -5,26 +5,24 @@ mod renderable;
 use clap::Parser;
 use osm::Osm;
 use osmpbf::ElementReader;
-use piet::{kurbo::PathEl, Color, RenderContext};
-use piet_common::Device;
+use raqote::{DrawOptions, DrawTarget, PathBuilder};
 use renderable::Point;
-use std::mem;
+use softbuffer::GraphicsContext;
+use winit::{
+    dpi::LogicalSize,
+    event::{Event, WindowEvent},
+    event_loop::{ControlFlow, EventLoop},
+    window::WindowBuilder,
+};
 
 #[derive(Parser)]
 struct Args {
     /// Open Street Data PBF data file
     pbf_file: String,
 
-    /// File to output png to
-    output: String,
-
-    /// Height and width of output in pixels
+    /// Minimum window size
     #[arg(long, default_value_t = 500)]
     size: usize,
-
-    /// Scaling of image
-    #[arg(long, default_value_t = 2)]
-    scale: usize,
 }
 
 #[derive(Debug)]
@@ -67,60 +65,89 @@ fn main() -> osmpbf::Result<()> {
     let d_lon = bounding.max_x - bounding.min_x;
     let scaling = f64::max(d_lat, d_lon);
 
-    let mut device = Device::new().unwrap();
-    let mut bitmap = device
-        .bitmap_target(
-            args.size * args.scale,
-            args.size * args.scale,
-            args.scale as f64,
-        )
-        .unwrap();
-    let mut ctx = bitmap.render_context();
+    // Set up window
+    let event_loop = EventLoop::new();
+    let window = {
+        let size = LogicalSize::new(args.size as f32, args.size as f32);
+        WindowBuilder::new()
+            .with_title("Map")
+            .with_inner_size(size)
+            .with_min_inner_size(size)
+            .build(&event_loop)
+            .unwrap()
+    };
+    let mut graphics_context = unsafe { GraphicsContext::new(&window, &window) }.unwrap();
 
-    ctx.clear(None, Color::WHITE);
+    event_loop.run(move |event, _, control_flow| {
+        *control_flow = ControlFlow::Wait;
 
-    for (_way_id, way) in osm_data.ways.iter() {
-        if let Some(way_type) = way.to_object() {
-            let points = way
-                .nodes
-                .iter()
-                .filter_map(|node_id| osm_data.nodes.get(node_id))
-                .map(|node| {
-                    let x = ((node.x - bounding.min_x) / scaling) * (args.size as f64);
-                    let y = (1.0 - (node.y - bounding.min_y) / scaling) * (args.size as f64);
+        match event {
+            Event::RedrawRequested(window_id) if window_id == window.id() => {
+                let (width, height) = {
+                    let size = window.inner_size();
+                    (size.width, size.height)
+                };
 
-                    Point::new(x, y)
-                })
-                .collect::<Vec<_>>();
+                let size = u32::min(width, height);
 
-            for renderable in way_type.get_renderables(&points) {
-                let mut points = renderable.path.into_iter().map(|p| p.into());
+                let mut dt = DrawTarget::new(width as i32, height as i32);
+                dt.clear(raqote::SolidSource::from_unpremultiplied_argb(
+                    0xff, 0xff, 0xff, 0xff,
+                ));
 
-                let path = &[
-                    &[PathEl::MoveTo(points.next().unwrap())],
-                    &points.map(PathEl::LineTo).collect::<Vec<_>>()[..],
-                ]
-                .concat();
+                for (_way_id, way) in osm_data.ways.iter() {
+                    if let Some(way_type) = way.to_object() {
+                        let points = way
+                            .nodes
+                            .iter()
+                            .filter_map(|node_id| osm_data.nodes.get(node_id))
+                            .map(|node| {
+                                let x = ((node.x - bounding.min_x) / scaling) * (size as f64);
+                                let y = (1.0 - (node.y - bounding.min_y) / scaling) * (size as f64);
 
-                if let Some(fill) = renderable.fill {
-                    ctx.fill(&path[..], &fill);
+                                Point::new(x as f32, y as f32)
+                            })
+                            .collect::<Vec<_>>();
+
+                        for renderable in way_type.get_renderables(&points) {
+                            let mut points = renderable.path.into_iter();
+
+                            let path = {
+                                let p = points.next().unwrap();
+                                let mut path = PathBuilder::new();
+                                path.move_to(p.x, p.y);
+                                path
+                            };
+                            let path = points
+                                .fold(path, |mut path, p| {
+                                    path.line_to(p.x, p.y);
+                                    path
+                                })
+                                .finish();
+
+                            if let Some(fill) = &renderable.fill {
+                                dt.fill(&path, &fill.into(), &DrawOptions::new());
+                            }
+
+                            if let Some(stroke) = &renderable.stroke {
+                                dt.stroke(
+                                    &path,
+                                    &(&stroke.color).into(),
+                                    &stroke.into(),
+                                    &DrawOptions::new(),
+                                );
+                            }
+                        }
+                    }
                 }
 
-                if let Some(stroke) = renderable.stroke {
-                    ctx.stroke_styled(
-                        &path[..],
-                        &stroke.color,
-                        stroke.width,
-                        &stroke.get_piet_stroke_style(),
-                    );
-                }
+                graphics_context.set_buffer(dt.get_data(), width as u16, height as u16);
             }
+            Event::WindowEvent {
+                window_id,
+                event: WindowEvent::CloseRequested,
+            } if window_id == window.id() => *control_flow = ControlFlow::Exit,
+            _ => {}
         }
-    }
-
-    ctx.finish().unwrap();
-    mem::drop(ctx);
-    bitmap.save_to_file(args.output).unwrap();
-
-    Ok(())
+    });
 }

@@ -1,6 +1,5 @@
 use super::Object;
-use crate::renderable::{Point, Renderable, Stroke, StrokeStyle};
-use piet::Color;
+use crate::renderable::{Color, Point, Renderable, Stroke, StrokeStyle};
 
 pub struct Park;
 
@@ -9,9 +8,9 @@ impl Object for Park {
         vec![Renderable::from_points(points)
             .with_stroke(Stroke {
                 width: 1.0,
-                color: Color::rgb8(122, 175, 117),
+                color: Color::new(122, 175, 117),
                 style: StrokeStyle::Solid,
             })
-            .with_fill(Color::rgb8(205, 247, 201))]
+            .with_fill(Color::new(205, 247, 201))]
     }
 }
