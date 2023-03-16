@@ -1,6 +1,6 @@
 use glow::{
     Context, HasContext, NativeBuffer, NativeProgram, NativeShader, NativeVertexArray,
-    UniformLocation, STATIC_DRAW,
+    UniformLocation,
 };
 use std::{
     cell::RefCell,
@@ -58,12 +58,14 @@ impl Debug for OpenGlInfo {
 
 pub struct OpenGl {
     gl: Rc<RefCell<Context>>,
+    programs: Vec<Rc<RefCell<Program>>>,
 }
 
 impl OpenGl {
     pub fn new(gl: Context) -> Self {
         Self {
             gl: Rc::new(RefCell::new(gl)),
+            programs: Vec::new(),
         }
     }
 
@@ -91,13 +93,11 @@ impl OpenGl {
         }
     }
 
-    pub fn create_program(&self) -> Program {
-        Program::with_gl(&self.gl)
-    }
+    pub fn create_program(&mut self) -> Rc<RefCell<Program>> {
+        let program = Rc::new(RefCell::new(Program::with_gl(&self.gl)));
+        self.programs.push(program.clone());
 
-    pub fn use_program(&self, program: &Program) {
-        let gl = self.gl.borrow();
-        unsafe { gl.use_program(Some(program.program)) };
+        program
     }
 
     pub fn render(&self) {
@@ -111,10 +111,17 @@ impl OpenGl {
             //     glow::FRONT_AND_BACK,
             //     if wireframe { glow::LINE } else { glow::FILL },
             // );
+            for program in &self.programs {
+                program.borrow().render();
+            }
 
             // TODO: Count should reflect the current program
-            gl.draw_arrays(glow::TRIANGLES, 0, 3);
+            // gl.draw_arrays(glow::TRIANGLES, 0, 3);
         }
+    }
+
+    pub fn clear_program(&self) {
+        unsafe { self.gl.borrow().use_program(None) };
     }
 }
 
@@ -136,10 +143,25 @@ pub struct Program {
     gl: Rc<RefCell<Context>>,
     shaders: Vec<NativeShader>,
     vertices: Vec<(NativeBuffer, NativeVertexArray)>,
+    vertex_count: Option<u32>,
     uniform_locations: HashMap<String, UniformLocation>,
 }
 
 impl Program {
+    pub fn use_program(&self) {
+        let gl = self.gl.borrow();
+        unsafe { gl.use_program(Some(self.program)) };
+    }
+
+    pub fn render(&self) {
+        self.use_program();
+
+        let gl = self.gl.borrow();
+        if let Some(vertex_count) = self.vertex_count {
+            unsafe { gl.draw_arrays(glow::TRIANGLES, 0, vertex_count as i32) };
+        }
+    }
+
     pub fn attach_shader(
         &mut self,
         shader_type: ShaderType,
@@ -174,6 +196,8 @@ impl Program {
         vertices: &[f32],
         format: &[VertexFormat],
     ) -> Result<(), OpenGlError> {
+        self.use_program();
+
         let gl = self.gl.borrow();
 
         // Construct the raw pointer
@@ -232,6 +256,12 @@ impl Program {
             }
         }
 
+        // TODO: Will change when take other slices
+        self.vertex_count = Some(
+            (vertices.len() as u32) / format.iter().fold(0, |count, format| count + format.count),
+        );
+        dbg!(self.vertex_count);
+
         self.vertices.push((vertex_buffer, vertex_array));
 
         Ok(())
@@ -260,6 +290,8 @@ impl Program {
     }
 
     pub fn set_uniform(&mut self, name: &str, value: f32) -> Result<(), OpenGlError> {
+        self.use_program();
+
         let gl = self.gl.borrow();
 
         let location = if let Some(location) = self.uniform_locations.get(name) {
@@ -287,6 +319,7 @@ impl Program {
             gl,
             shaders: Vec::new(),
             vertices: Vec::new(),
+            vertex_count: None,
             uniform_locations: HashMap::new(),
         }
     }

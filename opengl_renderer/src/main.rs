@@ -11,35 +11,35 @@ mod window;
 const WINDOW_SIZE: (usize, usize) = (480, 720);
 
 fn main() -> Result<(), OpenGlError> {
-    let window = Window::new(WINDOW_SIZE);
+    let mut window = Window::new(WINDOW_SIZE);
 
     println!("{:?}", window.gl.get_info());
 
-    let mut program = window.gl.create_program();
+    let program = window.gl.create_program();
 
-    program.attach_shader(ShaderType::Vertex, VERTEX_SHADER)?;
-    program.attach_shader(ShaderType::Fragment, FRAGMENT_SHADER)?;
+    {
+        let mut program = program.borrow_mut();
 
-    program.link()?;
+        program.attach_shader(ShaderType::Vertex, VERTEX_SHADER)?;
+        program.attach_shader(ShaderType::Fragment, FRAGMENT_SHADER)?;
 
-    // TODO: Use should be handled
-    window.gl.use_program(&program);
+        program.link()?;
 
-    program.attach_vertices(
-        &[
-            0.5f32, 1.0f32, 0.0, // V1
-            0.0f32, 0.0f32, 0.5, // V2
-            1.0f32, 0.0f32, 1.0, // V3
-        ],
-        &[
-            VertexFormat::new(2, VertexType::Float),
-            VertexFormat::new(1, VertexType::Float),
-        ],
-    )?;
+        program.attach_vertices(
+            &[
+                0.5f32, 1.0f32, 0.0, // V1
+                0.0f32, 0.0f32, 0.5, // V2
+                1.0f32, 0.0f32, 1.0, // V3
+            ],
+            &[
+                VertexFormat::new(2, VertexType::Float),
+                VertexFormat::new(1, VertexType::Float),
+            ],
+        )?;
 
-    program.set_uniform("blue", 0.5)?;
+        program.set_uniform("blue", 0.5)?;
+    }
 
-    // TODO
     window.render().unwrap();
 
     window.event_loop.run(|e, _, control_flow| {
