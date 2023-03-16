@@ -2,6 +2,8 @@ use std::f64::consts::PI;
 
 use super::Tags;
 
+const WGS84_A: f64 = 6378137.0;
+
 pub struct Node {
     pub x: f64,
     pub y: f64,
@@ -19,8 +21,8 @@ impl Node {
     }
 
     pub fn from_lon_lat(lon: f64, lat: f64) -> Node {
-        let x = lon;
-        let y = f64::ln(f64::tan((PI / 4.0) + (lat / 2.0)));
+        let x = WGS84_A * (lon + (2.0 * PI));
+        let y = WGS84_A * f64::ln((lat.sin() + 1.0) / lat.cos());
         Node {
             x,
             y,

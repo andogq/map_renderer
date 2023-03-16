@@ -30,7 +30,13 @@ pub(crate) fn render(
         0xff, 0xff, 0xff, 0xff,
     ));
 
-    for (_way_id, way) in osm_data.ways.iter() {
+    let filtered_ways = osm_data.ways.values().filter(|way| {
+        way.nodes
+            .iter()
+            .any(|node_id| bounding.contains(osm_data.nodes.get(node_id).unwrap()))
+    });
+
+    for way in filtered_ways {
         if let Some(way_type) = way.to_object() {
             let points = way
                 .nodes
