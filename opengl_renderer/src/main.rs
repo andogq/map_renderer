@@ -1,9 +1,9 @@
 use window::opengl::OpenGlError;
-use winit::event::{Event, WindowEvent};
+use winit::event::VirtualKeyCode;
 
 use crate::window::{
     opengl::{ShaderType, VertexFormat, VertexType},
-    Window,
+    Window, WindowAction,
 };
 
 mod window;
@@ -42,16 +42,17 @@ fn main() -> Result<(), OpenGlError> {
 
     window.render().unwrap();
 
-    window.event_loop.run(|e, _, control_flow| {
-        control_flow.set_wait();
-
-        if let Event::WindowEvent {
-            event: WindowEvent::CloseRequested,
-            ..
-        } = e
-        {
-            control_flow.set_exit()
+    window.run(|event| {
+        if let Some(keycode) = event.virtual_keycode {
+            match keycode {
+                VirtualKeyCode::Escape => {
+                    return Some(WindowAction::Close);
+                }
+                _ => (),
+            }
         }
+
+        None
     });
 
     // let program = {

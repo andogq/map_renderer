@@ -260,7 +260,6 @@ impl Program {
         self.vertex_count = Some(
             (vertices.len() as u32) / format.iter().fold(0, |count, format| count + format.count),
         );
-        dbg!(self.vertex_count);
 
         self.vertices.push((vertex_buffer, vertex_array));
 

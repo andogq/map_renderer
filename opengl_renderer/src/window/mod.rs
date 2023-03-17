@@ -7,14 +7,24 @@ use glutin::{
 };
 use glutin_winit::{DisplayBuilder, GlWindow};
 use raw_window_handle::HasRawWindowHandle;
-use winit::{dpi::LogicalSize, event_loop::EventLoop, window::WindowBuilder};
+use winit::{
+    dpi::LogicalSize,
+    event::{Event, KeyboardInput, WindowEvent},
+    event_loop::EventLoop,
+    window::WindowBuilder,
+};
 
 use self::opengl::OpenGl;
 
 pub mod opengl;
 
+pub enum WindowAction {
+    Close,
+    RequestRedraw,
+}
+
 pub struct Window {
-    pub event_loop: EventLoop<()>,
+    event_loop: EventLoop<()>,
     window: winit::window::Window,
     display: Display,
     gl_surface: Surface<WindowSurface>,
@@ -100,5 +110,34 @@ impl Window {
         self.gl.render();
 
         self.gl_surface.swap_buffers(&self.gl_context)
+    }
+
+    pub fn run<F>(self, mut event_handler: F) -> !
+    where
+        F: 'static + FnMut(KeyboardInput) -> Option<WindowAction>,
+    {
+        self.event_loop.run(move |event, _, control_flow| {
+            control_flow.set_wait();
+
+            match event {
+                Event::WindowEvent { window_id, event } if self.window.id() == window_id => {
+                    match event {
+                        WindowEvent::CloseRequested => {
+                            control_flow.set_exit();
+                        }
+                        WindowEvent::KeyboardInput { input, .. } => {
+                            if let Some(action) = event_handler(input) {
+                                match action {
+                                    WindowAction::Close => control_flow.set_exit(),
+                                    WindowAction::RequestRedraw => self.window.request_redraw(),
+                                }
+                            }
+                        }
+                        _ => {}
+                    }
+                }
+                _ => {}
+            }
+        });
     }
 }
