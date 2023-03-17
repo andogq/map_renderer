@@ -1,11 +1,9 @@
-use window::opengl::OpenGlError;
+use crate::opengl::{ShaderType, VertexFormat, VertexType};
+use crate::window::{Window, WindowAction};
+use opengl::OpenGlError;
 use winit::event::VirtualKeyCode;
 
-use crate::window::{
-    opengl::{ShaderType, VertexFormat, VertexType},
-    Window, WindowAction,
-};
-
+mod opengl;
 mod window;
 
 const WINDOW_SIZE: (usize, usize) = (480, 720);

@@ -14,9 +14,7 @@ use winit::{
     window::WindowBuilder,
 };
 
-use self::opengl::OpenGl;
-
-pub mod opengl;
+use crate::opengl::OpenGl;
 
 pub enum WindowAction {
     Close,
