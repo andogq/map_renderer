@@ -22,7 +22,7 @@ pub enum WindowAction {
 }
 
 pub struct Window {
-    event_loop: EventLoop<()>,
+    event_loop: Option<EventLoop<()>>,
     window: winit::window::Window,
     display: Display,
     gl_surface: Surface<WindowSurface>,
@@ -95,7 +95,7 @@ impl Window {
             unsafe { glow::Context::from_loader_function_cstr(|s| display.get_proc_address(s)) };
 
         Self {
-            event_loop,
+            event_loop: Some(event_loop),
             window,
             display,
             gl_surface,
@@ -104,20 +104,35 @@ impl Window {
         }
     }
 
+    pub fn get_size(&self) -> (u32, u32) {
+        let size = self
+            .window
+            .inner_size()
+            .to_logical::<u32>(self.window.scale_factor());
+
+        (size.height, size.width)
+    }
+
     pub fn render(&self) -> glutin::error::Result<()> {
         self.gl.render();
 
         self.gl_surface.swap_buffers(&self.gl_context)
     }
 
-    pub fn run<F>(self, mut event_handler: F) -> !
+    pub fn run<F>(mut self, mut event_handler: F) -> !
     where
         F: 'static + FnMut(KeyboardInput) -> Option<WindowAction>,
     {
-        self.event_loop.run(move |event, _, control_flow| {
+        let event_loop = self.event_loop.take().unwrap();
+
+        event_loop.run(move |event, _, control_flow| {
             control_flow.set_wait();
 
             match event {
+                Event::RedrawRequested(window_id) if self.window.id() == window_id => {
+                    // TODO: bad
+                    self.render().unwrap();
+                }
                 Event::WindowEvent { window_id, event } if self.window.id() == window_id => {
                     match event {
                         WindowEvent::CloseRequested => {

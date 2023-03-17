@@ -6,6 +6,7 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+glam = "0.23.0"
 glow = "0.12.1"
 glutin = "0.30.6"
 glutin-winit = "0.3.0"

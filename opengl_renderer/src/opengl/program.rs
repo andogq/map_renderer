@@ -1,3 +1,4 @@
+use glam::Mat4;
 use glow::{
     Context, HasContext, NativeBuffer, NativeProgram, NativeShader, NativeVertexArray,
     UniformLocation,
@@ -16,6 +17,22 @@ impl From<ShaderType> for u32 {
             ShaderType::Vertex => glow::VERTEX_SHADER,
             ShaderType::Fragment => glow::FRAGMENT_SHADER,
         }
+    }
+}
+
+pub trait UniformValue {
+    unsafe fn set_uniform(&self, gl: &Context, location: &UniformLocation);
+}
+
+impl UniformValue for f32 {
+    unsafe fn set_uniform(&self, gl: &Context, location: &UniformLocation) {
+        gl.uniform_1_f32(Some(location), *self)
+    }
+}
+
+impl UniformValue for Mat4 {
+    unsafe fn set_uniform(&self, gl: &Context, location: &UniformLocation) {
+        gl.uniform_matrix_4_f32_slice(Some(location), false, &self.to_cols_array())
     }
 }
 
@@ -169,7 +186,11 @@ impl Program {
         Ok(())
     }
 
-    pub fn set_uniform(&mut self, name: &str, value: f32) -> Result<(), OpenGlError> {
+    pub fn set_uniform(
+        &mut self,
+        name: &str,
+        value: &impl UniformValue,
+    ) -> Result<(), OpenGlError> {
         self.use_program();
 
         let gl = self.gl.borrow();
@@ -185,7 +206,7 @@ impl Program {
             return Err(OpenGlError::UniformNotFound(name.to_string()));
         };
 
-        unsafe { gl.uniform_1_f32(Some(location), value) };
+        unsafe { value.set_uniform(&gl, location) };
 
         Ok(())
     }
