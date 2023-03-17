@@ -43,27 +43,33 @@ impl World {
         }
     }
 
-    pub fn run(mut self) -> Result<(), OpenGlError> {
+    pub fn run(mut self) -> ! {
         let program = self.window.gl.create_program();
 
         {
             let mut program = program.borrow_mut();
 
-            program.attach_shader(ShaderType::Vertex, VERTEX_SHADER)?;
-            program.attach_shader(ShaderType::Fragment, FRAGMENT_SHADER)?;
-            program.link()?;
+            program
+                .attach_shader(ShaderType::Vertex, VERTEX_SHADER)
+                .unwrap();
+            program
+                .attach_shader(ShaderType::Fragment, FRAGMENT_SHADER)
+                .unwrap();
+            program.link().unwrap();
 
-            program.attach_vertices(
-                &[
-                    0.5, 0.0, 1.0, // V1
-                    0.0, 0.0, 0.0, // V2
-                    1.0, 0.0, 0.0, // V3
-                ],
-                &[VertexFormat::new(3, VertexType::Float)],
-            )?;
+            program
+                .attach_vertices(
+                    &[
+                        0.5, 0.0, 1.0, // V1
+                        0.0, 0.0, 0.0, // V2
+                        1.0, 0.0, 0.0, // V3
+                    ],
+                    &[VertexFormat::new(3, VertexType::Float)],
+                )
+                .unwrap();
 
-            program.set_uniform("projection", &self.projection)?;
-            program.set_uniform("view", &self.camera.view())?;
+            program.set_uniform("projection", &self.projection).unwrap();
+            program.set_uniform("view", &self.camera.view()).unwrap();
         }
 
         self.window.run(move |event| {
@@ -103,8 +109,6 @@ impl World {
 
             None
         });
-
-        Ok(())
     }
 }
 

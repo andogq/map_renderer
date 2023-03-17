@@ -14,5 +14,5 @@ fn main() -> Result<(), OpenGlError> {
     println!("{:?}", window.gl.get_info());
 
     let world = World::with_window(window);
-    world.run()
+    world.run();
 }
