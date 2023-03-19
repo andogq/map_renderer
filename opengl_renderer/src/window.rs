@@ -197,21 +197,40 @@ impl Window {
 
         let min_frame_time = Duration::from_secs(1) / FRAME_TARGET as u32;
         let mut last_frame_time = None;
+        let mut redraw_pending = false;
 
         event_loop.run(move |event, _, control_flow| {
             control_flow.set_wait();
 
             // Handle events
             let forward_event = match event {
-                // Event::RedrawRequested(window_id) if self.window.id() == window_id => {
-                //     // Record current frame time
-                //     last_frame_time = Some(Instant::now());
-                //
-                //     // TODO: bad
-                //     self.render().unwrap();
-                //
-                //     None
-                // }
+                Event::RedrawRequested(window_id) if self.window.id() == window_id => {
+                    // Attempt to re-render
+                    let now = Instant::now();
+                    let frame_time = last_frame_time.map(|last| now - last);
+                    if frame_time
+                        .map(|frame_time| frame_time > min_frame_time)
+                        .unwrap_or(true)
+                    {
+                        // Record current frame time
+                        last_frame_time = Some(now);
+
+                        println!(
+                            "fps: {}",
+                            1.0 / frame_time.unwrap_or_default().as_secs_f32()
+                        );
+
+                        // TODO: bad
+                        self.render().unwrap();
+
+                        redraw_pending = false;
+                    } else if let Some(frame_time) = frame_time {
+                        redraw_pending = true;
+                        control_flow.set_wait_timeout(min_frame_time - frame_time)
+                    }
+
+                    None
+                }
                 Event::WindowEvent { window_id, event } if self.window.id() == window_id => {
                     match event {
                         winit::event::WindowEvent::CloseRequested => {
@@ -246,25 +265,9 @@ impl Window {
                 }
             }
 
-            // Attempt to re-render
-            let now = Instant::now();
-            let frame_time = last_frame_time.map(|last| now - last);
-            if frame_time
-                .map(|frame_time| frame_time > min_frame_time)
-                .unwrap_or(true)
-            {
-                // Record current frame time
-                last_frame_time = Some(now);
-
-                println!(
-                    "fps: {}",
-                    1.0 / frame_time.unwrap_or_default().as_secs_f32()
-                );
-
-                // TODO: bad
-                self.render().unwrap();
-            } else if let Some(frame_time) = frame_time {
-                control_flow.set_wait_timeout(min_frame_time - frame_time)
+            if redraw_pending {
+                // Will end up in here if wait event runs through
+                self.window.request_redraw();
             }
         });
     }
