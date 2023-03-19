@@ -14,12 +14,13 @@ struct Camera {
 impl Camera {
     pub fn new() -> Self {
         Self {
-            position: Vec3::new(0.0, 20.0, 5.0),
+            position: Vec3::new(0.0, 20.0, 0.0),
         }
     }
 
     pub fn view(&self) -> Mat4 {
-        Mat4::look_to_rh(self.position, -self.position, Vec3::Y)
+        // Mat4::look_to_rh(self.position, -self.position, Vec3::Y)
+        Mat4::look_to_rh(self.position, Vec3::NEG_Y, Vec3::Z)
     }
 }
 
@@ -104,7 +105,14 @@ impl World {
 
             program.set_uniform("projection", &self.projection).unwrap();
             program.set_uniform("view", &self.camera.view()).unwrap();
+
+            program
+                .attach_vertices(&[generate_grid(16, 1.0)].concat())
+                .unwrap();
         }
+
+        let mut last_location = None;
+        let mut dragging = false;
 
         self.window.run(move |event, window_info| {
             let mut program = program.borrow_mut();
@@ -143,6 +151,8 @@ impl World {
                     // Trigger redraw
                     return Some(WindowAction::RequestRedraw);
                 }
+                WindowEvent::MouseDown => dragging = true,
+                WindowEvent::MouseUp => dragging = false,
                 WindowEvent::MouseMove {
                     physical_x,
                     physical_y,
@@ -183,15 +193,27 @@ impl World {
                             / (plane_normal.dot(normalised_ray))
                             * normalised_ray);
 
-                    point_program
-                        .attach_vertices(
-                            &[
-                                generate_grid(16, 1.0),
-                                plane_intersection.to_array().to_vec(),
-                            ]
-                            .concat(),
-                        )
-                        .unwrap();
+                    if dragging {
+                        if let Some(last) = last_location {
+                            let d: Vec3 = last - plane_intersection;
+
+                            if d.length() > 0.1 {
+                                dbg!(d);
+                                self.camera.position += d;
+
+                                program.set_uniform("view", &self.camera.view()).unwrap();
+                                point_program
+                                    .set_uniform("view", &self.camera.view())
+                                    .unwrap();
+
+                                last_location = None;
+                            }
+                        } else {
+                            last_location = Some(plane_intersection);
+                        }
+                    } else {
+                        last_location = None;
+                    }
 
                     return Some(WindowAction::RequestRedraw);
                 }
