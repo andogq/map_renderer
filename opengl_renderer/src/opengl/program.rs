@@ -1,9 +1,9 @@
 use glam::Mat4;
 use glow::{
     Context, HasContext, NativeBuffer, NativeProgram, NativeShader, NativeVertexArray,
-    UniformLocation,
+    UniformLocation, ARRAY_BUFFER,
 };
-use std::{cell::RefCell, collections::HashMap, rc::Rc};
+use std::{cell::RefCell, collections::HashMap, error::Error, fmt::Display, rc::Rc};
 
 use super::OpenGlError;
 
@@ -52,18 +52,181 @@ impl From<DrawType> for u32 {
     }
 }
 
+#[derive(Debug)]
+pub enum ProgramBuilderError {
+    MissingGl,
+    CreateProgram(String),
+    CreateShader(String),
+    ShaderCompile(String),
+    CreateVertexBuffer(String),
+    CreateVertexArray(String),
+    ProgramLink(String),
+}
+impl Display for ProgramBuilderError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "Problem building shader: {:?}", self)
+    }
+}
+impl Error for ProgramBuilderError {}
+
+#[derive(Default)]
+pub struct ProgramBuilder {
+    gl: Option<Rc<RefCell<Context>>>,
+    shaders: Vec<(ShaderType, String)>,
+    vertex_format: Vec<VertexFormat>,
+    draw_type: Option<DrawType>,
+}
+impl ProgramBuilder {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    pub fn with_gl(mut self, gl: Rc<RefCell<Context>>) -> Self {
+        self.gl = Some(gl);
+        self
+    }
+
+    pub fn with_shader(mut self, shader_type: ShaderType, source: &str) -> Self {
+        self.shaders.push((shader_type, source.to_string()));
+        self
+    }
+
+    pub fn with_format(mut self, format: &[VertexFormat]) -> Self {
+        self.vertex_format = format.to_vec();
+        self
+    }
+
+    pub fn with_draw_type(mut self, draw_type: DrawType) -> Self {
+        self.draw_type = Some(draw_type);
+        self
+    }
+
+    pub fn build(self) -> Result<Program, ProgramBuilderError> {
+        let gl = self.gl.ok_or(ProgramBuilderError::MissingGl)?;
+
+        let (program, vertex_buffer, vertex_array_object) = {
+            let gl = gl.borrow();
+
+            // Create the opengl program
+            let program =
+                unsafe { gl.create_program() }.map_err(ProgramBuilderError::CreateProgram)?;
+
+            // Build the shaders
+            let shaders = self
+                .shaders
+                .into_iter()
+                .map(|(shader_type, source)| {
+                    unsafe { gl.create_shader(shader_type.into()) }
+                        .map_err(ProgramBuilderError::CreateShader)
+                        .and_then(|shader| {
+                            unsafe {
+                                // Add source and compile
+                                gl.shader_source(shader, &source);
+                                gl.compile_shader(shader);
+
+                                // Check for errors
+                                if !gl.get_shader_compile_status(shader) {
+                                    return Err(ProgramBuilderError::ShaderCompile(
+                                        gl.get_shader_info_log(shader),
+                                    ));
+                                }
+
+                                // Add shader to program
+                                gl.attach_shader(program, shader);
+                            }
+
+                            Ok(shader)
+                        })
+                })
+                .collect::<Result<Vec<_>, ProgramBuilderError>>()?;
+
+            // Link the program
+            unsafe { gl.link_program(program) };
+            if unsafe { !gl.get_program_link_status(program) } {
+                return Err(ProgramBuilderError::ProgramLink(unsafe {
+                    gl.get_program_info_log(program)
+                }));
+            }
+
+            // Clean up shaders
+            for shader in shaders {
+                unsafe {
+                    gl.detach_shader(program, shader);
+                    gl.delete_shader(shader);
+                }
+            }
+
+            // Create the vertex buffer object and bind it so it can be detected by VAO
+            let vertex_buffer =
+                unsafe { gl.create_buffer() }.map_err(ProgramBuilderError::CreateVertexBuffer)?;
+            unsafe { gl.bind_buffer(glow::ARRAY_BUFFER, Some(vertex_buffer)) };
+
+            // Create vertex array object
+            let vertex_array_object = unsafe { gl.create_vertex_array() }
+                .map_err(ProgramBuilderError::CreateVertexArray)?;
+            unsafe { gl.bind_vertex_array(Some(vertex_array_object)) };
+
+            // Calculate the step size of vertex, and the offsets for each part of it
+            let (vertex_step, offsets) = self.vertex_format.iter().fold(
+                (0, {
+                    let mut v = Vec::with_capacity(self.vertex_format.len());
+                    v.push(0);
+                    v
+                }),
+                |(size, mut offsets), format| {
+                    offsets.push(offsets.last().cloned().unwrap_or(0) + format.size());
+                    (size + format.size(), offsets)
+                },
+            );
+
+            // Configur all of the attributes
+            for (i, (format, offset)) in self.vertex_format.iter().zip(offsets).enumerate() {
+                unsafe {
+                    gl.enable_vertex_attrib_array(i as u32);
+                    gl.vertex_attrib_pointer_f32(
+                        i as u32,
+                        format.count as i32,
+                        (&format.vertex_type).into(),
+                        false,
+                        vertex_step as i32,
+                        offset as i32,
+                    );
+                }
+            }
+
+            (program, vertex_buffer, vertex_array_object)
+        };
+
+        // Build the program
+        Ok(Program {
+            program,
+            gl,
+            vertex_buffer,
+            vertex_array_object,
+            vertex_count: None,
+            vertex_format: self.vertex_format,
+            uniform_locations: HashMap::new(),
+            draw_type: self.draw_type.unwrap_or(DrawType::Triangles),
+        })
+    }
+}
+
 pub struct Program {
     program: NativeProgram,
     gl: Rc<RefCell<Context>>,
-    shaders: Vec<NativeShader>,
-    vertex_buffer: Option<NativeBuffer>,
-    vertex_array_object: Option<NativeVertexArray>,
+    vertex_buffer: NativeBuffer,
+    vertex_array_object: NativeVertexArray,
     vertex_count: Option<u32>,
+    vertex_format: Vec<VertexFormat>,
     uniform_locations: HashMap<String, UniformLocation>,
-    pub draw_type: DrawType,
+    draw_type: DrawType,
 }
 
 impl Program {
+    pub fn builder() -> ProgramBuilder {
+        ProgramBuilder::new()
+    }
+
     pub fn use_program(&self) {
         let gl = self.gl.borrow();
         unsafe { gl.use_program(Some(self.program)) };
@@ -77,47 +240,14 @@ impl Program {
         if let Some(vertex_count) = self.vertex_count {
             unsafe {
                 // Rebind vertex array
-                gl.bind_vertex_array(self.vertex_array_object);
+                gl.bind_vertex_array(Some(self.vertex_array_object));
 
                 gl.draw_arrays(self.draw_type.into(), 0, vertex_count as i32);
             }
         }
     }
 
-    pub fn attach_shader(
-        &mut self,
-        shader_type: ShaderType,
-        source: &str,
-    ) -> Result<(), OpenGlError> {
-        let gl = self.gl.borrow();
-
-        if let Ok(shader) = unsafe { gl.create_shader(shader_type.into()) } {
-            unsafe {
-                // Compile shader
-                gl.shader_source(shader, source);
-                gl.compile_shader(shader);
-
-                if !gl.get_shader_compile_status(shader) {
-                    return Err(OpenGlError::ShaderCompile(gl.get_shader_info_log(shader)));
-                }
-
-                // Add shader to program
-                gl.attach_shader(self.program, shader);
-            }
-
-            self.shaders.push(shader);
-
-            Ok(())
-        } else {
-            Err(OpenGlError::ShaderCreate)
-        }
-    }
-
-    pub fn attach_vertices(
-        &mut self,
-        vertices: &[f32],
-        format: &[VertexFormat],
-    ) -> Result<(), OpenGlError> {
+    pub fn attach_vertices(&mut self, vertices: &[f32]) -> Result<(), OpenGlError> {
         self.use_program();
 
         let gl = self.gl.borrow();
@@ -130,83 +260,20 @@ impl Program {
             )
         };
 
-        // Create the vertex buffer
-        let vertex_buffer = unsafe {
-            let vertex_buffer = gl.create_buffer().map_err(OpenGlError::BufferCreate)?;
-
-            gl.bind_buffer(glow::ARRAY_BUFFER, Some(vertex_buffer));
+        // Bind vertex buffer and add data
+        unsafe {
+            gl.bind_buffer(glow::ARRAY_BUFFER, Some(self.vertex_buffer));
             gl.buffer_data_u8_slice(glow::ARRAY_BUFFER, vertices_u8, glow::STATIC_DRAW);
-
-            vertex_buffer
         };
-
-        // Create the vertex array object
-        let vertex_array_object = unsafe {
-            let vertex_array = gl
-                .create_vertex_array()
-                .map_err(OpenGlError::VertexArrayCreate)?;
-            gl.bind_vertex_array(Some(vertex_array));
-
-            vertex_array
-        };
-
-        let vertex_size = format.iter().fold(0, |size, format| size + format.size());
-        let offsets = format.iter().fold(
-            {
-                let mut v = Vec::with_capacity(format.len());
-                v.push(0); // Initial value will have 0 offset
-                v
-            },
-            |mut offsets, format| {
-                offsets.push(offsets.last().cloned().unwrap_or(0) + format.size());
-
-                offsets
-            },
-        );
-
-        for (i, format) in format.iter().enumerate() {
-            unsafe {
-                gl.enable_vertex_attrib_array(i as u32);
-                gl.vertex_attrib_pointer_f32(
-                    i as u32,
-                    format.count as i32,
-                    (&format.vertex_type).into(),
-                    false,
-                    vertex_size as i32,
-                    offsets[i] as i32,
-                );
-            }
-        }
 
         // TODO: Will change when take other slices
         self.vertex_count = Some(
-            (vertices.len() as u32) / format.iter().fold(0, |count, format| count + format.count),
+            (vertices.len() as u32)
+                / self
+                    .vertex_format
+                    .iter()
+                    .fold(0, |total_size, format| total_size + format.count),
         );
-
-        self.vertex_array_object = Some(vertex_array_object);
-        self.vertex_buffer = Some(vertex_buffer);
-
-        Ok(())
-    }
-
-    pub fn link(&mut self) -> Result<(), OpenGlError> {
-        let gl = self.gl.borrow();
-
-        unsafe {
-            gl.link_program(self.program);
-            if !gl.get_program_link_status(self.program) {
-                return Err(OpenGlError::LinkError);
-            }
-        }
-
-        // Clean up shaders
-        for shader in &self.shaders {
-            unsafe {
-                gl.detach_shader(self.program, *shader);
-                gl.delete_shader(*shader);
-            }
-        }
-        self.shaders = Vec::new();
 
         Ok(())
     }
@@ -235,24 +302,9 @@ impl Program {
 
         Ok(())
     }
-
-    pub fn with_gl(gl: &Rc<RefCell<Context>>) -> Self {
-        let gl = gl.clone();
-        let program = unsafe { gl.borrow().create_program().expect("program to be created") };
-
-        Self {
-            program,
-            gl,
-            shaders: Vec::new(),
-            vertex_array_object: None,
-            vertex_buffer: None,
-            vertex_count: None,
-            uniform_locations: HashMap::new(),
-            draw_type: DrawType::Triangles,
-        }
-    }
 }
 
+#[derive(Clone, Copy)]
 pub enum VertexType {
     Float,
 }
@@ -271,6 +323,7 @@ impl From<&VertexType> for u32 {
     }
 }
 
+#[derive(Clone, Copy)]
 pub struct VertexFormat {
     count: u32,
     vertex_type: VertexType,

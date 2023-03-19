@@ -92,11 +92,20 @@ impl OpenGl {
         }
     }
 
-    pub fn create_program(&mut self) -> Rc<RefCell<Program>> {
-        let program = Rc::new(RefCell::new(Program::with_gl(&self.gl)));
+    pub fn add_program(
+        &mut self,
+        builder: ProgramBuilder,
+    ) -> Result<Rc<RefCell<Program>>, ProgramBuilderError> {
+        // Build the program
+        let program = builder.with_gl(self.gl.clone()).build()?;
+
+        // Wrap it with Rc<Ref<T>>
+        let program = Rc::new(RefCell::new(program));
+
+        // Save the program
         self.programs.push(program.clone());
 
-        program
+        Ok(program)
     }
 
     pub fn render(&self) {

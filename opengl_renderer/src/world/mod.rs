@@ -4,7 +4,7 @@ use glam::{Mat4, Vec3, Vec4};
 use winit::event::{ElementState, VirtualKeyCode};
 
 use crate::{
-    opengl::{DrawType, ShaderType, VertexFormat, VertexType},
+    opengl::{DrawType, Program, ShaderType, VertexFormat, VertexType},
     window::{Window, WindowAction, WindowEvent},
 };
 
@@ -61,52 +61,49 @@ impl World {
     }
 
     pub fn run(mut self) -> ! {
-        let program = self.window.gl.create_program();
+        let program = self
+            .window
+            .gl
+            .add_program(
+                Program::builder()
+                    .with_shader(ShaderType::Vertex, VERTEX_SHADER)
+                    .with_shader(ShaderType::Fragment, FRAGMENT_SHADER)
+                    .with_format(&[VertexFormat::new(3, VertexType::Float)])
+                    .with_draw_type(DrawType::Triangles),
+            )
+            .unwrap();
+        let point_program = self
+            .window
+            .gl
+            .add_program(
+                Program::builder()
+                    .with_shader(ShaderType::Vertex, VERTEX_SHADER)
+                    .with_shader(ShaderType::Fragment, FRAGMENT_SHADER)
+                    .with_format(&[VertexFormat::new(3, VertexType::Float)])
+                    .with_draw_type(DrawType::Points),
+            )
+            .unwrap();
 
         {
             let mut program = program.borrow_mut();
 
             program
-                .attach_shader(ShaderType::Vertex, VERTEX_SHADER)
-                .unwrap();
-            program
-                .attach_shader(ShaderType::Fragment, FRAGMENT_SHADER)
-                .unwrap();
-            program.link().unwrap();
-
-            program
-                .attach_vertices(
-                    &[
-                        1.0, 1.0, 2.0, // V1
-                        0.0, 1.0, 0.0, // V2
-                        2.0, 1.0, 0.0, // V3
-                    ],
-                    &[VertexFormat::new(3, VertexType::Float)],
-                )
+                .attach_vertices(&[
+                    1.0, 1.0, 2.0, // V1
+                    0.0, 1.0, 0.0, // V2
+                    2.0, 1.0, 0.0, // V3
+                ])
                 .unwrap();
 
             program.set_uniform("projection", &self.projection).unwrap();
             program.set_uniform("view", &self.camera.view()).unwrap();
-
-            program.draw_type = DrawType::Triangles;
         }
 
-        let point_program = self.window.gl.create_program();
         {
             let mut program = point_program.borrow_mut();
 
-            program
-                .attach_shader(ShaderType::Vertex, VERTEX_SHADER)
-                .unwrap();
-            program
-                .attach_shader(ShaderType::Fragment, FRAGMENT_SHADER)
-                .unwrap();
-            program.link().unwrap();
-
             program.set_uniform("projection", &self.projection).unwrap();
             program.set_uniform("view", &self.camera.view()).unwrap();
-
-            program.draw_type = DrawType::Points;
         }
 
         self.window.run(move |event, window_info| {
@@ -193,7 +190,6 @@ impl World {
                                 plane_intersection.to_array().to_vec(),
                             ]
                             .concat(),
-                            &[VertexFormat::new(3, VertexType::Float)],
                         )
                         .unwrap();
 
