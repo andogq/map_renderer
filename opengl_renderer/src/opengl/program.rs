@@ -56,7 +56,8 @@ pub struct Program {
     program: NativeProgram,
     gl: Rc<RefCell<Context>>,
     shaders: Vec<NativeShader>,
-    vertices: Vec<(NativeBuffer, NativeVertexArray)>,
+    vertex_buffer: Option<NativeBuffer>,
+    vertex_array_object: Option<NativeVertexArray>,
     vertex_count: Option<u32>,
     uniform_locations: HashMap<String, UniformLocation>,
     pub draw_type: DrawType,
@@ -74,8 +75,12 @@ impl Program {
         let gl = self.gl.borrow();
         unsafe { gl.enable(glow::PROGRAM_POINT_SIZE) };
         if let Some(vertex_count) = self.vertex_count {
-            unsafe { gl.draw_arrays(glow::POINTS, 0, vertex_count as i32) };
-            unsafe { gl.draw_arrays(glow::LINES, 0, vertex_count as i32) };
+            unsafe {
+                // Rebind vertex array
+                gl.bind_vertex_array(self.vertex_array_object);
+
+                gl.draw_arrays(self.draw_type.into(), 0, vertex_count as i32);
+            }
         }
     }
 
@@ -88,7 +93,7 @@ impl Program {
 
         if let Ok(shader) = unsafe { gl.create_shader(shader_type.into()) } {
             unsafe {
-                // Comopile shader
+                // Compile shader
                 gl.shader_source(shader, source);
                 gl.compile_shader(shader);
 
@@ -136,7 +141,7 @@ impl Program {
         };
 
         // Create the vertex array object
-        let vertex_array = unsafe {
+        let vertex_array_object = unsafe {
             let vertex_array = gl
                 .create_vertex_array()
                 .map_err(OpenGlError::VertexArrayCreate)?;
@@ -178,7 +183,8 @@ impl Program {
             (vertices.len() as u32) / format.iter().fold(0, |count, format| count + format.count),
         );
 
-        self.vertices.push((vertex_buffer, vertex_array));
+        self.vertex_array_object = Some(vertex_array_object);
+        self.vertex_buffer = Some(vertex_buffer);
 
         Ok(())
     }
@@ -238,7 +244,8 @@ impl Program {
             program,
             gl,
             shaders: Vec::new(),
-            vertices: Vec::new(),
+            vertex_array_object: None,
+            vertex_buffer: None,
             vertex_count: None,
             uniform_locations: HashMap::new(),
             draw_type: DrawType::Triangles,

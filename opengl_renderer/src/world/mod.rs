@@ -74,27 +74,26 @@ impl World {
                 .unwrap();
             program.link().unwrap();
 
-            // program
-            //     .attach_vertices(
-            //         // &[
-            //         //     1.0, 0.0, 2.0, // V1
-            //         //     0.0, 0.0, 0.0, // V2
-            //         //     2.0, 0.0, 0.0, // V3
-            //         // ],
-            //         &generate_grid(12, 1.0),
-            //         &[VertexFormat::new(3, VertexType::Float)],
-            //     )
-            //     .unwrap();
+            program
+                .attach_vertices(
+                    &[
+                        1.0, 1.0, 2.0, // V1
+                        0.0, 1.0, 0.0, // V2
+                        2.0, 1.0, 0.0, // V3
+                    ],
+                    &[VertexFormat::new(3, VertexType::Float)],
+                )
+                .unwrap();
 
             program.set_uniform("projection", &self.projection).unwrap();
             program.set_uniform("view", &self.camera.view()).unwrap();
 
-            program.draw_type = DrawType::Points;
+            program.draw_type = DrawType::Triangles;
         }
 
-        let line_program = self.window.gl.create_program();
+        let point_program = self.window.gl.create_program();
         {
-            let mut program = line_program.borrow_mut();
+            let mut program = point_program.borrow_mut();
 
             program
                 .attach_shader(ShaderType::Vertex, VERTEX_SHADER)
@@ -107,12 +106,12 @@ impl World {
             program.set_uniform("projection", &self.projection).unwrap();
             program.set_uniform("view", &self.camera.view()).unwrap();
 
-            program.draw_type = DrawType::Lines;
+            program.draw_type = DrawType::Points;
         }
 
         self.window.run(move |event, window_info| {
             let mut program = program.borrow_mut();
-            let mut line_program = line_program.borrow_mut();
+            let mut point_program = point_program.borrow_mut();
 
             match event {
                 WindowEvent::Keyboard {
@@ -140,6 +139,9 @@ impl World {
 
                     // Update uniforms
                     program.set_uniform("view", &self.camera.view()).unwrap();
+                    point_program
+                        .set_uniform("view", &self.camera.view())
+                        .unwrap();
 
                     // Trigger redraw
                     return Some(WindowAction::RequestRedraw);
@@ -184,14 +186,11 @@ impl World {
                             / (plane_normal.dot(normalised_ray))
                             * normalised_ray);
 
-                    program
+                    point_program
                         .attach_vertices(
                             &[
                                 generate_grid(16, 1.0),
-                                // glam::Vec3::ZERO.to_array().to_vec(),
                                 plane_intersection.to_array().to_vec(),
-                                // (Vec3::new(10.0, 0.0, 10.0)).to_array().to_vec(),
-                                // (self.camera.position * 0.9).to_array().to_vec(),
                             ]
                             .concat(),
                             &[VertexFormat::new(3, VertexType::Float)],
