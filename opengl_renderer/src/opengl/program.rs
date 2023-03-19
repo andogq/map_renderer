@@ -36,6 +36,22 @@ impl UniformValue for Mat4 {
     }
 }
 
+#[derive(Clone, Copy)]
+pub enum DrawType {
+    Triangles,
+    Points,
+    Lines,
+}
+impl From<DrawType> for u32 {
+    fn from(value: DrawType) -> Self {
+        match value {
+            DrawType::Triangles => glow::TRIANGLES,
+            DrawType::Points => glow::POINTS,
+            DrawType::Lines => glow::LINES,
+        }
+    }
+}
+
 pub struct Program {
     program: NativeProgram,
     gl: Rc<RefCell<Context>>,
@@ -43,6 +59,7 @@ pub struct Program {
     vertices: Vec<(NativeBuffer, NativeVertexArray)>,
     vertex_count: Option<u32>,
     uniform_locations: HashMap<String, UniformLocation>,
+    pub draw_type: DrawType,
 }
 
 impl Program {
@@ -55,8 +72,10 @@ impl Program {
         self.use_program();
 
         let gl = self.gl.borrow();
+        unsafe { gl.enable(glow::PROGRAM_POINT_SIZE) };
         if let Some(vertex_count) = self.vertex_count {
-            unsafe { gl.draw_arrays(glow::TRIANGLES, 0, vertex_count as i32) };
+            unsafe { gl.draw_arrays(glow::POINTS, 0, vertex_count as i32) };
+            unsafe { gl.draw_arrays(glow::LINES, 0, vertex_count as i32) };
         }
     }
 
@@ -222,6 +241,7 @@ impl Program {
             vertices: Vec::new(),
             vertex_count: None,
             uniform_locations: HashMap::new(),
+            draw_type: DrawType::Triangles,
         }
     }
 }

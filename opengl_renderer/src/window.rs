@@ -9,7 +9,7 @@ use glutin_winit::{DisplayBuilder, GlWindow};
 use raw_window_handle::HasRawWindowHandle;
 use winit::{
     dpi::LogicalSize,
-    event::{Event, KeyboardInput, WindowEvent},
+    event::{ElementState, Event, KeyboardInput, VirtualKeyCode},
     event_loop::EventLoop,
     window::WindowBuilder,
 };
@@ -19,6 +19,66 @@ use crate::opengl::OpenGl;
 pub enum WindowAction {
     Close,
     RequestRedraw,
+}
+
+pub enum WindowEvent {
+    Keyboard {
+        keycode: VirtualKeyCode,
+        state: ElementState,
+    },
+    MouseMove {
+        physical_x: f32,
+        physical_y: f32,
+    },
+}
+
+pub struct WindowSize {
+    pub height: u32,
+    pub width: u32,
+}
+impl From<(usize, usize)> for WindowSize {
+    fn from(size: (usize, usize)) -> Self {
+        Self {
+            height: size.0 as u32,
+            width: size.1 as u32,
+        }
+    }
+}
+impl<P: Into<u32>> From<LogicalSize<P>> for WindowSize {
+    fn from(value: LogicalSize<P>) -> Self {
+        Self {
+            width: value.width.into(),
+            height: value.height.into(),
+        }
+    }
+}
+
+pub struct WindowInfo {
+    pub size: WindowSize,
+    pub scale: f32,
+}
+
+impl TryFrom<winit::event::WindowEvent<'_>> for WindowEvent {
+    type Error = ();
+
+    fn try_from(event: winit::event::WindowEvent<'_>) -> Result<Self, Self::Error> {
+        match event {
+            winit::event::WindowEvent::KeyboardInput {
+                input:
+                    KeyboardInput {
+                        state,
+                        virtual_keycode: Some(keycode),
+                        ..
+                    },
+                ..
+            } => Ok(Self::Keyboard { keycode, state }),
+            winit::event::WindowEvent::CursorMoved { position, .. } => Ok(Self::MouseMove {
+                physical_x: position.x as f32,
+                physical_y: position.y as f32,
+            }),
+            _ => Err(()),
+        }
+    }
 }
 
 pub struct Window {
@@ -121,35 +181,50 @@ impl Window {
 
     pub fn run<F>(mut self, mut event_handler: F) -> !
     where
-        F: 'static + FnMut(KeyboardInput) -> Option<WindowAction>,
+        F: 'static + FnMut(WindowEvent, WindowInfo) -> Option<WindowAction>,
     {
         let event_loop = self.event_loop.take().unwrap();
 
         event_loop.run(move |event, _, control_flow| {
             control_flow.set_wait();
 
-            match event {
+            let forward_event = match event {
                 Event::RedrawRequested(window_id) if self.window.id() == window_id => {
                     // TODO: bad
                     self.render().unwrap();
+
+                    None
                 }
                 Event::WindowEvent { window_id, event } if self.window.id() == window_id => {
                     match event {
-                        WindowEvent::CloseRequested => {
+                        winit::event::WindowEvent::CloseRequested => {
                             control_flow.set_exit();
+                            None
                         }
-                        WindowEvent::KeyboardInput { input, .. } => {
-                            if let Some(action) = event_handler(input) {
-                                match action {
-                                    WindowAction::Close => control_flow.set_exit(),
-                                    WindowAction::RequestRedraw => self.window.request_redraw(),
-                                }
-                            }
-                        }
-                        _ => {}
+                        window_event => window_event.try_into().ok(),
                     }
                 }
-                _ => {}
+                // Event::DeviceEvent { event, .. } => event.try_into().ok(),
+                _ => None,
+            };
+
+            if let Some(event) = forward_event {
+                let window_scale = self.window.scale_factor();
+                let window_info = WindowInfo {
+                    size: self
+                        .window
+                        .inner_size()
+                        .to_logical::<u32>(window_scale)
+                        .into(),
+                    scale: window_scale as f32,
+                };
+
+                if let Some(action) = event_handler(event, window_info) {
+                    match action {
+                        WindowAction::Close => control_flow.set_exit(),
+                        WindowAction::RequestRedraw => self.window.request_redraw(),
+                    }
+                }
             }
         });
     }
