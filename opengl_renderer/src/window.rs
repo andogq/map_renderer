@@ -215,10 +215,10 @@ impl Window {
                         // Record current frame time
                         last_frame_time = Some(now);
 
-                        println!(
-                            "fps: {}",
-                            1.0 / frame_time.unwrap_or_default().as_secs_f32()
-                        );
+                        // println!(
+                        //     "fps: {}",
+                        //     1.0 / frame_time.unwrap_or_default().as_secs_f32()
+                        // );
 
                         // TODO: bad
                         self.render().unwrap();

@@ -114,6 +114,8 @@ impl World {
         let mut last_location = None;
         let mut dragging = false;
 
+        let mut t = 0.0;
+
         self.window.run(move |event, window_info| {
             let mut program = program.borrow_mut();
             let mut point_program = point_program.borrow_mut();
@@ -151,8 +153,14 @@ impl World {
                     // Trigger redraw
                     return Some(WindowAction::RequestRedraw);
                 }
-                WindowEvent::MouseDown => dragging = true,
-                WindowEvent::MouseUp => dragging = false,
+                WindowEvent::MouseDown => {
+                    t = 0.0;
+                    dragging = true;
+                }
+                WindowEvent::MouseUp => {
+                    last_location = None;
+                    dragging = false;
+                }
                 WindowEvent::MouseMove {
                     physical_x,
                     physical_y,
@@ -195,19 +203,22 @@ impl World {
 
                     if dragging {
                         if let Some(last) = last_location {
-                            let d: Vec3 = last - plane_intersection;
+                            let translation = last - plane_intersection;
+                            let target_transition = self.camera.position + translation;
 
-                            if d.length() > 0.1 {
-                                dbg!(d);
-                                self.camera.position += d;
+                            let distance = self.camera.position.distance(target_transition);
+                            let t = f32::clamp(0.2 * distance, 0.01, 1.0);
 
-                                program.set_uniform("view", &self.camera.view()).unwrap();
-                                point_program
-                                    .set_uniform("view", &self.camera.view())
-                                    .unwrap();
+                            self.camera.position =
+                                glam::Vec3::lerp(self.camera.position, target_transition, t);
+                            last_location = Some(
+                                plane_intersection - (self.camera.position - target_transition),
+                            );
 
-                                last_location = None;
-                            }
+                            program.set_uniform("view", &self.camera.view()).unwrap();
+                            point_program
+                                .set_uniform("view", &self.camera.view())
+                                .unwrap();
                         } else {
                             last_location = Some(plane_intersection);
                         }
