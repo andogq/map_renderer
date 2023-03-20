@@ -1,4 +1,4 @@
-use std::f32::consts::PI;
+use std::{f32::consts::PI, fs};
 
 use glam::{Mat4, Vec3, Vec4};
 use winit::event::{ElementState, VirtualKeyCode};
@@ -7,6 +7,9 @@ use crate::{
     opengl::{DrawType, Program, ShaderType, VertexFormat, VertexType},
     window::{Window, WindowAction, WindowEvent},
 };
+
+const VERTEX_SHADER: &str = "opengl_renderer/src/shaders/vert.glsl";
+const FRAGMENT_SHADER: &str = "opengl_renderer/src/shaders/frag.glsl";
 
 struct Camera {
     position: Vec3,
@@ -62,13 +65,19 @@ impl World {
     }
 
     pub fn run(mut self) -> ! {
+        let vertex_shader = fs::read_to_string(VERTEX_SHADER).unwrap();
+        let fragment_shader = fs::read_to_string(FRAGMENT_SHADER).unwrap();
+
+        dbg!(&vertex_shader);
+        dbg!(&fragment_shader);
+
         let program = self
             .window
             .gl
             .add_program(
                 Program::builder()
-                    .with_shader(ShaderType::Vertex, VERTEX_SHADER)
-                    .with_shader(ShaderType::Fragment, FRAGMENT_SHADER)
+                    .with_shader(ShaderType::Vertex, &vertex_shader)
+                    .with_shader(ShaderType::Fragment, &fragment_shader)
                     .with_format(&[VertexFormat::new(3, VertexType::Float)])
                     .with_draw_type(DrawType::Triangles),
             )
@@ -78,8 +87,8 @@ impl World {
             .gl
             .add_program(
                 Program::builder()
-                    .with_shader(ShaderType::Vertex, VERTEX_SHADER)
-                    .with_shader(ShaderType::Fragment, FRAGMENT_SHADER)
+                    .with_shader(ShaderType::Vertex, &vertex_shader)
+                    .with_shader(ShaderType::Fragment, &fragment_shader)
                     .with_format(&[VertexFormat::new(3, VertexType::Float)])
                     .with_draw_type(DrawType::Points),
             )
@@ -235,37 +244,3 @@ impl World {
         });
     }
 }
-
-const VERTEX_SHADER: &str = r#"
-#version 410
-
-layout(location = 0) in vec3 position;
-
-out vec3 out_position;
-
-uniform mat4 projection;
-uniform mat4 view;
-
-void main() {
-    out_position = position;
-    gl_Position = projection * view * vec4(position, 1.0);
-    gl_PointSize = 5.0;
-}
-"#;
-
-const FRAGMENT_SHADER: &str = r#"
-#version 410
-
-in vec3 out_position;
-out vec4 color;
-
-void main() {
-    if (out_position.x == 0) {
-        color = vec4(0.0, 0.0, 1.0, 1.0);
-    } else if (out_position.z == 0) {
-        color = vec4(1.0, 0.0, 0.0, 1.0);
-    } else {
-        color = vec4(0.6, 0.6, 0.6, 1.0);
-    }
-}
-"#;
