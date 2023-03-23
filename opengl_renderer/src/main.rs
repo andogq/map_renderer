@@ -40,7 +40,7 @@ fn main() -> Result<(), OpenGlError> {
             y: 0.0,
             z: 7.0,
         },
-        width: 1.0,
+        width: 3.0,
     });
 
     world.run();

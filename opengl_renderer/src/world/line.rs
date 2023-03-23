@@ -16,6 +16,12 @@ pub struct Line {
 }
 impl Line {
     pub fn flatten(&self) -> Vec<f32> {
-        [self.start.flatten(), self.end.flatten()].concat()
+        [
+            self.start.flatten().as_slice(),
+            &[self.width],
+            self.end.flatten().as_slice(),
+            &[self.width],
+        ]
+        .concat()
     }
 }

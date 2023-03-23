@@ -1,15 +1,14 @@
 #version 410 core
 
 layout(location = 0) in vec3 in_position;
+layout(location = 1) in float in_width;
 
-out vec3 position;
-
-uniform mat4 projection;
-uniform mat4 view;
+out VertexData {
+    vec3 position;
+    float width;
+} out_data;
 
 void main() {
-    position = in_position;
-
-    gl_Position = projection * view * vec4(in_position, 1.0);
-    gl_PointSize = 5.0;
+    out_data.position = in_position;
+    out_data.width = in_width;
 }

@@ -58,7 +58,10 @@ impl World {
             .add_program(
                 Program::from_directory("line")
                     .unwrap()
-                    .with_format(&[VertexFormat::new(3, VertexType::Float)])
+                    .with_format(&[
+                        VertexFormat::new(3, VertexType::Float),
+                        VertexFormat::new(1, VertexType::Float)
+                    ])
                     .with_draw_type(DrawType::Lines),
             )
             .unwrap();
