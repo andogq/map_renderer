@@ -20,7 +20,6 @@ impl Camera {
     }
 
     pub fn view(&self) -> Mat4 {
-        // Mat4::look_to_rh(self.position, -self.position, Vec3::Y)
         Mat4::look_to_rh(self.position, Vec3::Y, Vec3::Z)
     }
 }
@@ -67,13 +66,15 @@ impl World {
         let mut last_location = None;
         let mut dragging = false;
 
-        line_program
-            .borrow_mut()
-            .set_uniform("projection", &self.projection)
-            .unwrap();
-
-        self.window.run(move |event, window_info| {
+        {
             let mut line_program = line_program.borrow_mut();
+
+            line_program
+                .set_uniform("projection", &self.projection)
+                .unwrap();
+            line_program
+                .set_uniform("view", &self.camera.view())
+                .unwrap();
 
             let line_vertices = self
                 .lines
@@ -82,6 +83,10 @@ impl World {
                 .collect::<Vec<_>>()
                 .concat();
             line_program.attach_vertices(&line_vertices).unwrap();
+        }
+
+        self.window.run(move |event, window_info| {
+            let mut line_program = line_program.borrow_mut();
 
             match event {
                 WindowEvent::Keyboard {
