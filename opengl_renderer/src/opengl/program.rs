@@ -3,19 +3,41 @@ use glow::{
     Context, HasContext, NativeBuffer, NativeProgram, NativeShader, NativeVertexArray,
     UniformLocation, ARRAY_BUFFER,
 };
-use std::{cell::RefCell, collections::HashMap, error::Error, fmt::Display, rc::Rc};
+use std::{
+    cell::RefCell,
+    collections::HashMap,
+    error::Error,
+    fmt::Display,
+    fs::{self, FileType},
+    path::{Path, PathBuf},
+    rc::Rc,
+};
 
 use super::OpenGlError;
 
 pub enum ShaderType {
     Vertex,
+    Geometry,
     Fragment,
 }
 impl From<ShaderType> for u32 {
     fn from(ty: ShaderType) -> Self {
         match ty {
             ShaderType::Vertex => glow::VERTEX_SHADER,
+            ShaderType::Geometry => glow::GEOMETRY_SHADER,
             ShaderType::Fragment => glow::FRAGMENT_SHADER,
+        }
+    }
+}
+impl TryFrom<&str> for ShaderType {
+    type Error = ();
+
+    fn try_from(value: &str) -> Result<Self, Self::Error> {
+        match value {
+            "vert" | "vertex" => Ok(Self::Vertex),
+            "geom" | "geometry" => Ok(Self::Geometry),
+            "frag" | "fragment" => Ok(Self::Fragment),
+            _ => Err(()),
         }
     }
 }
@@ -54,6 +76,7 @@ impl From<DrawType> for u32 {
 
 #[derive(Debug)]
 pub enum ProgramBuilderError {
+    IoError(std::io::Error),
     MissingGl,
     CreateProgram(String),
     CreateShader(String),
@@ -225,6 +248,35 @@ pub struct Program {
 impl Program {
     pub fn builder() -> ProgramBuilder {
         ProgramBuilder::new()
+    }
+
+    pub fn from_directory(directory_name: &str) -> Result<ProgramBuilder, ProgramBuilderError> {
+        let mut builder = ProgramBuilder::new();
+
+        // Read the directory
+        let directory = Path::new("opengl_renderer/src/shaders").join(directory_name);
+        for entry in fs::read_dir(directory).map_err(ProgramBuilderError::IoError)? {
+            let entry = entry.map_err(ProgramBuilderError::IoError)?;
+
+            // Check if file
+            if entry
+                .file_type()
+                .map_err(ProgramBuilderError::IoError)?
+                .is_file()
+            {
+                // Check if valid file type
+                let stripped_name = entry.file_name().to_string_lossy().replace(".glsl", "");
+                if let Ok(shader_type) = ShaderType::try_from(stripped_name.as_str()) {
+                    // Read file contents
+                    let source =
+                        fs::read_to_string(entry.path()).map_err(ProgramBuilderError::IoError)?;
+
+                    builder = builder.with_shader(shader_type, source.as_str());
+                }
+            }
+        }
+
+        Ok(builder)
     }
 
     pub fn use_program(&self) {

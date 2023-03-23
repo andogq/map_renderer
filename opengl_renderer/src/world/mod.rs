@@ -1,15 +1,13 @@
-use std::{f32::consts::PI, fs};
-
-use glam::{Mat4, Vec3, Vec4};
-use winit::event::{ElementState, VirtualKeyCode};
-
+use self::line::Line;
 use crate::{
-    opengl::{DrawType, Program, ShaderType, VertexFormat, VertexType},
+    opengl::{DrawType, Program, VertexFormat, VertexType},
     window::{Window, WindowAction, WindowEvent},
 };
+use glam::{Mat4, Vec3, Vec4};
+use std::f32::consts::PI;
+use winit::event::{ElementState, VirtualKeyCode};
 
-const VERTEX_SHADER: &str = "opengl_renderer/src/shaders/vert.glsl";
-const FRAGMENT_SHADER: &str = "opengl_renderer/src/shaders/frag.glsl";
+pub mod line;
 
 struct Camera {
     position: Vec3,
@@ -17,13 +15,13 @@ struct Camera {
 impl Camera {
     pub fn new() -> Self {
         Self {
-            position: Vec3::new(0.0, 20.0, 0.0),
+            position: Vec3::new(0.0, -20.0, 0.0),
         }
     }
 
     pub fn view(&self) -> Mat4 {
         // Mat4::look_to_rh(self.position, -self.position, Vec3::Y)
-        Mat4::look_to_rh(self.position, Vec3::NEG_Y, Vec3::Z)
+        Mat4::look_to_rh(self.position, Vec3::Y, Vec3::Z)
     }
 }
 
@@ -31,23 +29,8 @@ pub struct World {
     window: Window,
     projection: Mat4,
     camera: Camera,
-}
 
-fn generate_grid(size: u32, spacing: f32) -> Vec<f32> {
-    let mut grid = Vec::new();
-
-    let start = -0.5 * size as f32 * spacing;
-
-    for i in 0..size {
-        for j in 0..size {
-            let x = start + (i as f32 * spacing);
-            let z = start + (j as f32 * spacing);
-
-            grid.extend_from_slice(&[x, 0.0, z]);
-        }
-    }
-
-    grid
+    lines: Vec<Line>,
 }
 
 impl World {
@@ -61,73 +44,44 @@ impl World {
             window,
             projection: Mat4::perspective_rh(PI / 2.0, aspect_ratio, 1.0, 50.0),
             camera: Camera::new(),
+            lines: Vec::new(),
         }
     }
 
+    pub fn add_line(&mut self, line: Line) {
+        self.lines.push(line);
+    }
+
     pub fn run(mut self) -> ! {
-        let vertex_shader = fs::read_to_string(VERTEX_SHADER).unwrap();
-        let fragment_shader = fs::read_to_string(FRAGMENT_SHADER).unwrap();
-
-        dbg!(&vertex_shader);
-        dbg!(&fragment_shader);
-
-        let program = self
+        let line_program = self
             .window
             .gl
             .add_program(
-                Program::builder()
-                    .with_shader(ShaderType::Vertex, &vertex_shader)
-                    .with_shader(ShaderType::Fragment, &fragment_shader)
+                Program::from_directory("line")
+                    .unwrap()
                     .with_format(&[VertexFormat::new(3, VertexType::Float)])
-                    .with_draw_type(DrawType::Triangles),
+                    .with_draw_type(DrawType::Lines),
             )
             .unwrap();
-        let point_program = self
-            .window
-            .gl
-            .add_program(
-                Program::builder()
-                    .with_shader(ShaderType::Vertex, &vertex_shader)
-                    .with_shader(ShaderType::Fragment, &fragment_shader)
-                    .with_format(&[VertexFormat::new(3, VertexType::Float)])
-                    .with_draw_type(DrawType::Points),
-            )
-            .unwrap();
-
-        {
-            let mut program = program.borrow_mut();
-
-            program
-                .attach_vertices(&[
-                    1.0, 1.0, 2.0, // V1
-                    0.0, 1.0, 0.0, // V2
-                    2.0, 1.0, 0.0, // V3
-                ])
-                .unwrap();
-
-            program.set_uniform("projection", &self.projection).unwrap();
-            program.set_uniform("view", &self.camera.view()).unwrap();
-        }
-
-        {
-            let mut program = point_program.borrow_mut();
-
-            program.set_uniform("projection", &self.projection).unwrap();
-            program.set_uniform("view", &self.camera.view()).unwrap();
-
-            program
-                .attach_vertices(&[generate_grid(16, 1.0)].concat())
-                .unwrap();
-        }
 
         let mut last_location = None;
         let mut dragging = false;
 
-        let mut t = 0.0;
+        line_program
+            .borrow_mut()
+            .set_uniform("projection", &self.projection)
+            .unwrap();
 
         self.window.run(move |event, window_info| {
-            let mut program = program.borrow_mut();
-            let mut point_program = point_program.borrow_mut();
+            let mut line_program = line_program.borrow_mut();
+
+            let line_vertices = self
+                .lines
+                .iter()
+                .map(|line| line.flatten())
+                .collect::<Vec<_>>()
+                .concat();
+            line_program.attach_vertices(&line_vertices).unwrap();
 
             match event {
                 WindowEvent::Keyboard {
@@ -153,9 +107,7 @@ impl World {
                         _ => (),
                     }
 
-                    // Update uniforms
-                    program.set_uniform("view", &self.camera.view()).unwrap();
-                    point_program
+                    line_program
                         .set_uniform("view", &self.camera.view())
                         .unwrap();
 
@@ -163,7 +115,6 @@ impl World {
                     return Some(WindowAction::RequestRedraw);
                 }
                 WindowEvent::MouseDown => {
-                    t = 0.0;
                     dragging = true;
                 }
                 WindowEvent::MouseUp => {
@@ -210,6 +161,8 @@ impl World {
                             / (plane_normal.dot(normalised_ray))
                             * normalised_ray);
 
+                    dbg!(plane_intersection);
+
                     if dragging {
                         if let Some(last) = last_location {
                             let translation = last - plane_intersection;
@@ -224,8 +177,7 @@ impl World {
                                 plane_intersection - (self.camera.position - target_transition),
                             );
 
-                            program.set_uniform("view", &self.camera.view()).unwrap();
-                            point_program
+                            line_program
                                 .set_uniform("view", &self.camera.view())
                                 .unwrap();
                         } else {

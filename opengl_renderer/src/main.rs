@@ -1,4 +1,5 @@
 use crate::window::Window;
+use crate::world::line::{Line, Point};
 use crate::world::World;
 use opengl::OpenGlError;
 
@@ -13,6 +14,34 @@ fn main() -> Result<(), OpenGlError> {
 
     println!("{:?}", window.gl.get_info());
 
-    let world = World::with_window(window);
+    let mut world = World::with_window(window);
+    world.add_line(Line {
+        start: Point {
+            x: 0.0,
+            y: 0.0,
+            z: 0.0,
+        },
+        end: Point {
+            x: 10.0,
+            y: 0.0,
+            z: 10.0,
+        },
+        width: 1.0,
+    });
+
+    world.add_line(Line {
+        start: Point {
+            x: -5.0,
+            y: 0.0,
+            z: 3.0,
+        },
+        end: Point {
+            x: -9.0,
+            y: 0.0,
+            z: 7.0,
+        },
+        width: 1.0,
+    });
+
     world.run();
 }
