@@ -1,6 +1,7 @@
 use crate::window::Window;
-use crate::world::line::{Line, Point};
+use crate::world::line::Line;
 use crate::world::World;
+use glam::Vec3;
 use opengl::OpenGlError;
 
 mod opengl;
@@ -16,31 +17,17 @@ fn main() -> Result<(), OpenGlError> {
 
     let mut world = World::with_window(window);
     world.add_line(Line {
-        start: Point {
-            x: 0.0,
-            y: 0.0,
-            z: 0.0,
-        },
-        end: Point {
-            x: 10.0,
-            y: 0.0,
-            z: 10.0,
-        },
+        start: Vec3::new(0.0, 0.0, 0.0),
+        end: Vec3::new(10.0, 0.0, 10.0),
         width: 1.0,
+        color: Vec3::new(0.3, 0.8, 0.1),
     });
 
     world.add_line(Line {
-        start: Point {
-            x: -5.0,
-            y: 0.0,
-            z: 3.0,
-        },
-        end: Point {
-            x: -9.0,
-            y: 0.0,
-            z: 7.0,
-        },
+        start: Vec3::new(-5.0, 0.0, 3.0),
+        end: Vec3::new(-9.0, 0.0, 7.0),
         width: 3.0,
+        color: Vec3::new(0.7, 0.2, 0.4),
     });
 
     world.run();

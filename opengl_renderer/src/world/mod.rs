@@ -60,7 +60,8 @@ impl World {
                     .unwrap()
                     .with_format(&[
                         VertexFormat::new(3, VertexType::Float),
-                        VertexFormat::new(1, VertexType::Float)
+                        VertexFormat::new(1, VertexType::Float),
+                        VertexFormat::new(3, VertexType::Float),
                     ])
                     .with_draw_type(DrawType::Lines),
             )

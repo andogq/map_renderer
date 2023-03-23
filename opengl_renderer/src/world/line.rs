@@ -1,26 +1,20 @@
-pub struct Point {
-    pub x: f32,
-    pub y: f32,
-    pub z: f32,
-}
-impl Point {
-    pub fn flatten(&self) -> [f32; 3] {
-        [self.x, self.y, self.z]
-    }
-}
+use glam::Vec3;
 
 pub struct Line {
-    pub start: Point,
-    pub end: Point,
+    pub start: Vec3,
+    pub end: Vec3,
     pub width: f32,
+    pub color: Vec3,
 }
 impl Line {
     pub fn flatten(&self) -> Vec<f32> {
         [
-            self.start.flatten().as_slice(),
+            self.start.to_array().as_slice(),
             &[self.width],
-            self.end.flatten().as_slice(),
+            self.color.to_array().as_slice(),
+            self.end.to_array().as_slice(),
             &[self.width],
+            self.color.to_array().as_slice(),
         ]
         .concat()
     }
