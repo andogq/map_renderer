@@ -1,6 +1,6 @@
 use self::line::Line;
 use crate::{
-    opengl::{DrawType, Program, VertexFormat, VertexType},
+    opengl::{DrawArrays, DrawType, Program, VertexFormat, VertexType},
     window::{Window, WindowAction, WindowEvent},
 };
 use glam::{Mat4, Vec3, Vec4};
@@ -80,13 +80,20 @@ impl World {
                 .set_uniform("view", &self.camera.view())
                 .unwrap();
 
+            let count = self
+                .lines
+                .iter()
+                .map(|line| line.points.len() as u32)
+                .collect::<Vec<_>>();
+
             let line_vertices = self
                 .lines
                 .iter()
-                .map(|line| line.flatten())
-                .collect::<Vec<_>>()
-                .concat();
-            line_program.attach_vertices(&line_vertices).unwrap();
+                .flat_map(|line| line.flatten())
+                .collect::<Vec<_>>();
+            line_program
+                .attach_vertices(&line_vertices, Some(DrawArrays::new_continuous(count)))
+                .unwrap();
         }
 
         self.window.run(move |event, window_info| {

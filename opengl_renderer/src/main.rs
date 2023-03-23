@@ -17,15 +17,18 @@ fn main() -> Result<(), OpenGlError> {
 
     let mut world = World::with_window(window);
     world.add_line(Line {
-        start: Vec3::new(0.0, 0.0, 0.0),
-        end: Vec3::new(10.0, 0.0, 10.0),
+        points: vec![
+            Vec3::new(0.0, 0.0, 0.0),
+            Vec3::new(0.0, 0.0, 10.0),
+            Vec3::new(10.0, 0.0, 10.0),
+            Vec3::new(10.0, 0.0, 0.0),
+        ],
         width: 1.0,
         color: Vec3::new(0.3, 0.8, 0.1),
     });
 
     world.add_line(Line {
-        start: Vec3::new(-5.0, 0.0, 3.0),
-        end: Vec3::new(-9.0, 0.0, 7.0),
+        points: vec![Vec3::new(-5.0, 0.0, 3.0), Vec3::new(-9.0, 0.0, 7.0)],
         width: 3.0,
         color: Vec3::new(0.7, 0.2, 0.4),
     });

@@ -69,7 +69,7 @@ impl From<DrawType> for u32 {
         match value {
             DrawType::Triangles => glow::TRIANGLES,
             DrawType::Points => glow::POINTS,
-            DrawType::Lines => glow::LINES,
+            DrawType::Lines => glow::LINE_STRIP,
         }
     }
 }
@@ -202,7 +202,7 @@ impl ProgramBuilder {
                 },
             );
 
-            // Configur all of the attributes
+            // Configure all of the attributes
             for (i, (format, offset)) in self.vertex_format.iter().zip(offsets).enumerate() {
                 unsafe {
                     gl.enable_vertex_attrib_array(i as u32);
@@ -230,7 +230,29 @@ impl ProgramBuilder {
             vertex_format: self.vertex_format,
             uniform_locations: HashMap::new(),
             draw_type: self.draw_type.unwrap_or(DrawType::Triangles),
+            draw_arrays: None,
         })
+    }
+}
+
+pub struct DrawArrays {
+    first: Vec<u32>,
+    count: Vec<u32>,
+}
+impl DrawArrays {
+    pub fn new(first: Vec<u32>, count: Vec<u32>) -> Self {
+        Self { first, count }
+    }
+
+    pub fn new_continuous(count: Vec<u32>) -> Self {
+        let first = {
+            let mut v = count.clone();
+            v.insert(0, 0); // First vertex occurs at index 0
+            v.pop(); // Don't need the last element
+            v
+        };
+
+        Self { first, count }
     }
 }
 
@@ -243,6 +265,7 @@ pub struct Program {
     vertex_format: Vec<VertexFormat>,
     uniform_locations: HashMap<String, UniformLocation>,
     draw_type: DrawType,
+    draw_arrays: Option<DrawArrays>,
 }
 
 impl Program {
@@ -290,16 +313,26 @@ impl Program {
         let gl = self.gl.borrow();
         unsafe { gl.enable(glow::PROGRAM_POINT_SIZE) };
         if let Some(vertex_count) = self.vertex_count {
-            unsafe {
-                // Rebind vertex array
-                gl.bind_vertex_array(Some(self.vertex_array_object));
+            // Rebind vertex array
+            unsafe { gl.bind_vertex_array(Some(self.vertex_array_object)) };
 
-                gl.draw_arrays(self.draw_type.into(), 0, vertex_count as i32);
+            if let Some(DrawArrays { first, count }) = self.draw_arrays.as_ref() {
+                // glow doesn't support glMultiDrawArrays, but *alegedly* this has the same
+                // performance impact
+                for (&first, &count) in first.iter().zip(count.iter()) {
+                    unsafe { gl.draw_arrays(self.draw_type.into(), first as i32, count as i32) };
+                }
+            } else {
+                unsafe { gl.draw_arrays(self.draw_type.into(), 0, vertex_count as i32) };
             }
         }
     }
 
-    pub fn attach_vertices(&mut self, vertices: &[f32]) -> Result<(), OpenGlError> {
+    pub fn attach_vertices(
+        &mut self,
+        vertices: &[f32],
+        draw_arrays: Option<DrawArrays>,
+    ) -> Result<(), OpenGlError> {
         self.use_program();
 
         let gl = self.gl.borrow();
@@ -326,6 +359,8 @@ impl Program {
                     .iter()
                     .fold(0, |total_size, format| total_size + format.count),
         );
+
+        self.draw_arrays = draw_arrays;
 
         Ok(())
     }
