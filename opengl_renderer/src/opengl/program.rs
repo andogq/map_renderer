@@ -63,13 +63,15 @@ pub enum DrawType {
     Triangles,
     Points,
     Lines,
+    LineStrip
 }
 impl From<DrawType> for u32 {
     fn from(value: DrawType) -> Self {
         match value {
             DrawType::Triangles => glow::TRIANGLES,
             DrawType::Points => glow::POINTS,
-            DrawType::Lines => glow::LINE_STRIP,
+            DrawType::Lines => glow::LINES,
+            DrawType::LineStrip => glow::LINE_STRIP,
         }
     }
 }
@@ -256,6 +258,19 @@ impl DrawArrays {
     }
 }
 
+pub trait VertexData {
+    fn get_bytes(&self) -> Vec<u8>;
+}
+
+impl<V> VertexData for &[V]
+where
+    V: VertexData,
+{
+    fn get_bytes(&self) -> Vec<u8> {
+        self.iter().flat_map(|v| v.get_bytes()).collect()
+    }
+}
+
 pub struct Program {
     program: NativeProgram,
     gl: Rc<RefCell<Context>>,
@@ -330,12 +345,14 @@ impl Program {
 
     pub fn attach_vertices(
         &mut self,
-        vertices: &[f32],
+        vertices: impl VertexData,
         draw_arrays: Option<DrawArrays>,
     ) -> Result<(), OpenGlError> {
         self.use_program();
 
         let gl = self.gl.borrow();
+
+        let vertices = vertices.get_bytes();
 
         // Construct the raw pointer
         let vertices_u8 = unsafe {
@@ -394,11 +411,15 @@ impl Program {
 #[derive(Clone, Copy)]
 pub enum VertexType {
     Float,
+    UInt,
+    Bool,
 }
 impl VertexType {
     pub fn size(&self) -> u32 {
         match self {
             VertexType::Float => 4,
+            VertexType::UInt => 4,
+            VertexType::Bool => 4,
         }
     }
 }
@@ -406,6 +427,8 @@ impl From<&VertexType> for u32 {
     fn from(vertex_type: &VertexType) -> Self {
         match vertex_type {
             VertexType::Float => glow::FLOAT,
+            VertexType::UInt => glow::UNSIGNED_INT,
+            VertexType::Bool => glow::BOOL,
         }
     }
 }

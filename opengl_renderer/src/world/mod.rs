@@ -1,6 +1,6 @@
 use self::line::Line;
 use crate::{
-    opengl::{DrawArrays, DrawType, Program, VertexFormat, VertexType},
+    opengl::{DrawArrays, DrawType, Program, VertexData, VertexFormat, VertexType},
     window::{Window, WindowAction, WindowEvent},
 };
 use glam::{Mat4, Vec3, Vec4};
@@ -62,8 +62,9 @@ impl World {
                         VertexFormat::new(3, VertexType::Float),
                         VertexFormat::new(1, VertexType::Float),
                         VertexFormat::new(3, VertexType::Float),
+                        VertexFormat::new(1, VertexType::Float),
                     ])
-                    .with_draw_type(DrawType::Lines),
+                    .with_draw_type(DrawType::LineStrip),
             )
             .unwrap();
 
@@ -86,13 +87,11 @@ impl World {
                 .map(|line| line.points.len() as u32)
                 .collect::<Vec<_>>();
 
-            let line_vertices = self
-                .lines
-                .iter()
-                .flat_map(|line| line.flatten())
-                .collect::<Vec<_>>();
             line_program
-                .attach_vertices(&line_vertices, Some(DrawArrays::new_continuous(count)))
+                .attach_vertices(
+                    self.lines.as_slice(),
+                    Some(DrawArrays::new_continuous(count)),
+                )
                 .unwrap();
         }
 

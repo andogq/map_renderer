@@ -25,13 +25,17 @@ fn main() -> Result<(), OpenGlError> {
         ],
         width: 1.0,
         color: Vec3::new(0.3, 0.8, 0.1),
+        stroke_length: Some(2.0),
     });
 
     world.add_line(Line {
         points: vec![Vec3::new(-5.0, 0.0, 3.0), Vec3::new(-9.0, 0.0, 7.0)],
         width: 3.0,
         color: Vec3::new(0.7, 0.2, 0.4),
+        stroke_length: None,
     });
+
+    println!("{:?}", (true as u32).to_ne_bytes());
 
     world.run();
 }
