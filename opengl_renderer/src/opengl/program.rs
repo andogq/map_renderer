@@ -63,7 +63,7 @@ pub enum DrawType {
     Triangles,
     Points,
     Lines,
-    LineStrip
+    LineStrip,
 }
 impl From<DrawType> for u32 {
     fn from(value: DrawType) -> Self {
@@ -247,12 +247,13 @@ impl DrawArrays {
     }
 
     pub fn new_continuous(count: Vec<u32>) -> Self {
-        let first = {
-            let mut v = count.clone();
-            v.insert(0, 0); // First vertex occurs at index 0
-            v.pop(); // Don't need the last element
-            v
-        };
+        // Really yucky
+        let mut first = Vec::with_capacity(count.len());
+        first.push(0);
+
+        for i in 1..count.len() {
+            first.push(first[i - 1] + count[i - 1]);
+        }
 
         Self { first, count }
     }
