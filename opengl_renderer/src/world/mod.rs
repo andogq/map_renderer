@@ -1,6 +1,6 @@
-use self::line::Line;
+use self::{line::Line, polygon::Polygon};
 use crate::{
-    opengl::{DrawArrays, DrawType, Program, VertexData, VertexFormat, VertexType},
+    opengl::{DrawArrays, DrawType, Program, VertexFormat, VertexType},
     window::{Window, WindowAction, WindowEvent},
 };
 use glam::{Mat4, Vec3, Vec4};
@@ -8,6 +8,7 @@ use std::f32::consts::PI;
 use winit::event::{ElementState, VirtualKeyCode};
 
 pub mod line;
+pub mod polygon;
 
 struct Camera {
     position: Vec3,
@@ -30,6 +31,7 @@ pub struct World {
     camera: Camera,
 
     lines: Vec<Line>,
+    polygons: Vec<Polygon>,
 }
 
 impl World {
@@ -44,11 +46,16 @@ impl World {
             projection: Mat4::perspective_rh(PI / 2.0, aspect_ratio, 1.0, 50.0),
             camera: Camera::new(),
             lines: Vec::new(),
+            polygons: Vec::new(),
         }
     }
 
     pub fn add_line(&mut self, line: Line) {
         self.lines.push(line);
+    }
+
+    pub fn add_polygon(&mut self, polygon: Polygon) {
+        self.polygons.push(polygon);
     }
 
     pub fn run(mut self) -> ! {
@@ -65,6 +72,20 @@ impl World {
                         VertexFormat::new(1, VertexType::Float),
                     ])
                     .with_draw_type(DrawType::LineStrip),
+            )
+            .unwrap();
+
+        let polygon_program = self
+            .window
+            .gl
+            .add_program(
+                Program::from_directory("polygon")
+                    .unwrap()
+                    .with_format(&[
+                        VertexFormat::new(3, VertexType::Float),
+                        VertexFormat::new(3, VertexType::Float),
+                    ])
+                    .with_draw_type(DrawType::Triangles),
             )
             .unwrap();
 
@@ -90,6 +111,30 @@ impl World {
             line_program
                 .attach_vertices(
                     self.lines.as_slice(),
+                    Some(DrawArrays::new_continuous(count)),
+                )
+                .unwrap();
+        }
+
+        {
+            let mut polygon_program = polygon_program.borrow_mut();
+
+            polygon_program
+                .set_uniform("projection", &self.projection)
+                .unwrap();
+            polygon_program
+                .set_uniform("view", &self.camera.view())
+                .unwrap();
+
+            let count = self
+                .polygons
+                .iter_mut()
+                .map(|polygon| polygon.triangulate().len() as u32)
+                .collect::<Vec<_>>();
+
+            polygon_program
+                .attach_vertices(
+                    self.polygons.as_slice(),
                     Some(DrawArrays::new_continuous(count)),
                 )
                 .unwrap();

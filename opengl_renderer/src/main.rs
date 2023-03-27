@@ -1,5 +1,6 @@
 use crate::window::Window;
 use crate::world::line::Line;
+use crate::world::polygon::Polygon;
 use crate::world::World;
 use glam::Vec3;
 use opengl::OpenGlError;
@@ -35,7 +36,26 @@ fn main() -> Result<(), OpenGlError> {
         stroke_length: None,
     });
 
-    println!("{:?}", (true as u32).to_ne_bytes());
+    let polygon_points = vec![
+        Vec3::new(-3.0, 0.0, 3.0),
+        Vec3::new(1.0, 0.0, 0.0),
+        Vec3::new(2.0, 0.0, 3.0),
+        Vec3::new(3.0, 0.0, 1.0),
+        Vec3::new(1.0, 0.0, -3.0),
+    ];
+
+    world.add_line(Line {
+        points: polygon_points
+            .iter()
+            .map(|p| *p + Vec3::new(5.0, 0.0, 0.0))
+            .collect(),
+        width: 0.3,
+        color: Vec3::new(1.0, 0.3, 0.8),
+        stroke_length: None,
+    });
+
+    let polygon = Polygon::new(polygon_points, Vec3::new(0.5, 0.3, 0.1));
+    world.add_polygon(polygon);
 
     world.run();
 }
