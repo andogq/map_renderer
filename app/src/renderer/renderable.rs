@@ -1,5 +1,6 @@
 use super::{Color, Point, Stroke};
 
+#[derive(Debug)]
 pub struct Renderable {
     pub path: Vec<Point>,
     pub stroke: Option<Stroke>,

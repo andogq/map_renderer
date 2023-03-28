@@ -1,5 +1,6 @@
 use super::Color;
 
+#[derive(Debug)]
 #[allow(dead_code)]
 pub enum DashStyle {
     Even,
@@ -17,6 +18,7 @@ impl DashStyle {
     }
 }
 
+#[derive(Debug)]
 pub enum StrokeStyle {
     Solid,
     Dashed(DashStyle),
@@ -35,6 +37,7 @@ impl StrokeStyle {
     }
 }
 
+#[derive(Debug)]
 pub struct Stroke {
     pub width: f32,
     pub color: Color,

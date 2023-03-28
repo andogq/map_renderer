@@ -7,17 +7,10 @@ impl Object for Railway {
     fn get_renderables(&self, points: &[Point]) -> Vec<Renderable> {
         let color = Color::new(164, 214, 255);
 
-        vec![
-            Renderable::from_points(points).with_stroke(Stroke {
-                width: 1.0,
-                color,
-                style: StrokeStyle::Solid,
-            }),
-            Renderable::from_points(points).with_stroke(Stroke {
-                width: 0.05,
-                color,
-                style: StrokeStyle::Dashed(DashStyle::Custom(vec![0.1, 2.0])),
-            }),
-        ]
+        vec![Renderable::from_points(points).with_stroke(Stroke {
+            width: 1.0,
+            color,
+            style: StrokeStyle::Solid,
+        })]
     }
 }

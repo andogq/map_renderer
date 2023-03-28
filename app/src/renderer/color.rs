@@ -1,4 +1,6 @@
-#[derive(Clone, Copy)]
+use glam::Vec3;
+
+#[derive(Debug, Clone, Copy)]
 pub struct Color {
     r: u8,
     g: u8,
@@ -20,5 +22,15 @@ impl From<&Color> for raqote::SolidSource {
 impl From<&Color> for raqote::Source<'_> {
     fn from(color: &Color) -> Self {
         Self::Solid(color.into())
+    }
+}
+
+impl From<Color> for Vec3 {
+    fn from(color: Color) -> Self {
+        Vec3::new(
+            color.r as f32 / 255_f32,
+            color.g as f32 / 255_f32,
+            color.b as f32 / 255_f32,
+        )
     }
 }

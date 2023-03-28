@@ -1120,6 +1120,8 @@ name = "pbf"
 version = "0.1.0"
 dependencies = [
  "clap",
+ "glam",
+ "opengl_renderer",
  "osmpbf",
  "raqote",
  "softbuffer",

@@ -3,6 +3,11 @@ mod osm;
 mod renderer;
 
 use clap::Parser;
+use glam::Vec3;
+use opengl_renderer::{
+    window::Window,
+    world::{line::Line, World},
+};
 use osm::{Node, Osm};
 use osmpbf::ElementReader;
 use renderer::render;
@@ -13,6 +18,8 @@ use winit::{
     event_loop::EventLoop,
     window::WindowBuilder,
 };
+
+use crate::renderer::Point;
 
 #[derive(Parser)]
 struct Args {
@@ -140,91 +147,49 @@ fn main() -> osmpbf::Result<()> {
         .unwrap()
         .equalise();
 
-    // Set up window
-    let event_loop = EventLoop::new();
-    let window = {
-        let size = LogicalSize::new(args.size as f32, args.size as f32);
-        WindowBuilder::new()
-            .with_title("Map")
-            .with_inner_size(size)
-            .with_min_inner_size(size)
-            .build(&event_loop)
-            .unwrap()
-    };
-    let mut graphics_context = unsafe { GraphicsContext::new(&window, &window) }.unwrap();
+    let window = Window::new((args.size, args.size));
+    println!("{:?}", window.gl.get_info());
 
-    // Prepare app state
-    let mut app_state = {
-        let PhysicalSize { height, width, .. } = window.inner_size();
+    let mut world = World::with_window(window);
 
-        AppState {
-            bounding,
-            height,
-            width,
-        }
-    };
+    let d_lat = bounding.max_y - bounding.min_y;
+    let d_lon = bounding.max_x - bounding.min_x;
+    let scaling = 500_f64 / f64::max(d_lat, d_lon);
 
-    // Start event loop
-    event_loop.run(move |event, _, control_flow| {
-        control_flow.set_wait();
+    // Add all of the lines
+    for way in osm_data.ways.values() {
+        if let Some(way_type) = way.to_object() {
+            let points = way
+                .nodes
+                .iter()
+                .filter_map(|node_id| osm_data.nodes.get(node_id))
+                .map(|node| {
+                    let x = (node.x - bounding.min_x - (d_lat / 2.0)) * scaling;
+                    let y = (node.y - bounding.min_y - (d_lon / 2.0)) * scaling;
 
-        match event {
-            Event::RedrawRequested(window_id) if window_id == window.id() => {
-                // Update window size
-                let (width, height) = {
-                    let size = window.inner_size();
-                    (size.width, size.height)
+                    Point::new(x as f32, y as f32)
+                })
+                .collect::<Vec<_>>();
+
+            for renderable in way_type.get_renderables(&points) {
+                let line = Line {
+                    points: renderable
+                        .path
+                        .into_iter()
+                        .map(|p| Vec3::new(p.x, 0.0, p.y))
+                        .collect(),
+                    width: renderable.stroke.as_ref().map(|s| s.width).unwrap_or(1.0) / 10.0,
+                    color: renderable
+                        .stroke
+                        .map(|s| s.color.into())
+                        .unwrap_or_else(|| Vec3::new(0.0, 0.0, 0.0)),
+                    stroke_length: None,
                 };
-                app_state.width = width;
-                app_state.height = height;
 
-                // Render data
-                let dt = render(&app_state, &osm_data);
-
-                // Push buffer to window
-                graphics_context.set_buffer(dt.get_data(), width as u16, height as u16);
+                world.add_line(line);
             }
-            Event::WindowEvent { window_id, event } if window_id == window.id() => match event {
-                WindowEvent::KeyboardInput {
-                    input:
-                        KeyboardInput {
-                            virtual_keycode: Some(keycode),
-                            state: ElementState::Pressed,
-                            ..
-                        },
-                    ..
-                } => match keycode {
-                    VirtualKeyCode::Equals => {
-                        app_state.bounding.zoom(ZoomDirection::In);
-                        window.request_redraw();
-                    }
-                    VirtualKeyCode::Minus => {
-                        app_state.bounding.zoom(ZoomDirection::Out);
-                        window.request_redraw();
-                    }
-                    VirtualKeyCode::Left | VirtualKeyCode::A => {
-                        app_state.bounding.pan(PanDirection::Left);
-                        window.request_redraw();
-                    }
-                    VirtualKeyCode::Right | VirtualKeyCode::D => {
-                        app_state.bounding.pan(PanDirection::Right);
-                        window.request_redraw();
-                    }
-                    VirtualKeyCode::Up | VirtualKeyCode::W => {
-                        app_state.bounding.pan(PanDirection::Up);
-                        window.request_redraw();
-                    }
-                    VirtualKeyCode::Down | VirtualKeyCode::S => {
-                        app_state.bounding.pan(PanDirection::Down);
-                        window.request_redraw();
-                    }
-                    VirtualKeyCode::Escape => control_flow.set_exit(),
-                    _ => {}
-                },
-                WindowEvent::CloseRequested => control_flow.set_exit(),
-                _ => {}
-            },
-            _ => {}
         }
-    });
+    }
+
+    world.run();
 }
