@@ -103,17 +103,8 @@ impl World {
                 .set_uniform("view", &self.camera.view())
                 .unwrap();
 
-            let count = self
-                .lines
-                .iter()
-                .map(|line| line.points.len() as u32)
-                .collect::<Vec<_>>();
-
             line_program
-                .attach_vertices(
-                    self.lines.as_slice(),
-                    None,
-                )
+                .attach_vertices(self.lines.as_slice(), None)
                 .unwrap();
         }
 
@@ -248,6 +239,14 @@ impl World {
                         last_location = None;
                     }
 
+                    return Some(WindowAction::RequestRedraw);
+                }
+                WindowEvent::Scroll { x: _, y } => {
+                    self.camera.position.y += y / 10.0;
+
+                    line_program
+                        .set_uniform("view", &self.camera.view())
+                        .unwrap();
                     return Some(WindowAction::RequestRedraw);
                 }
                 _ => (),

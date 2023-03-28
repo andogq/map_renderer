@@ -12,7 +12,10 @@ use glutin_winit::{DisplayBuilder, GlWindow};
 use raw_window_handle::HasRawWindowHandle;
 use winit::{
     dpi::LogicalSize,
-    event::{ElementState, Event, KeyboardInput, MouseButton, VirtualKeyCode},
+    event::{
+        ElementState, Event, KeyboardInput, MouseButton, MouseScrollDelta, TouchPhase,
+        VirtualKeyCode,
+    },
     event_loop::EventLoop,
     window::WindowBuilder,
 };
@@ -35,6 +38,10 @@ pub enum WindowEvent {
     },
     MouseDown,
     MouseUp,
+    Scroll {
+        x: f32,
+        y: f32,
+    },
 }
 
 pub struct WindowSize {
@@ -86,6 +93,14 @@ impl TryFrom<winit::event::WindowEvent<'_>> for WindowEvent {
                 (MouseButton::Left, ElementState::Released) => Ok(Self::MouseUp),
                 _ => Err(()),
             },
+            winit::event::WindowEvent::MouseWheel {
+                delta: MouseScrollDelta::PixelDelta(position),
+                phase: TouchPhase::Moved,
+                ..
+            } => Ok(Self::Scroll {
+                x: position.x as f32,
+                y: position.y as f32,
+            }),
             _ => Err(()),
         }
     }
