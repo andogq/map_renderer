@@ -66,6 +66,7 @@ impl World {
                 Program::from_directory("line")
                     .unwrap()
                     .with_format(&[
+                        VertexFormat::new(1, VertexType::UInt),
                         VertexFormat::new(3, VertexType::Float),
                         VertexFormat::new(1, VertexType::Float),
                         VertexFormat::new(3, VertexType::Float),
@@ -111,7 +112,7 @@ impl World {
             line_program
                 .attach_vertices(
                     self.lines.as_slice(),
-                    Some(DrawArrays::new_continuous(count)),
+                    None,
                 )
                 .unwrap();
         }
@@ -221,7 +222,7 @@ impl World {
                             / (plane_normal.dot(normalised_ray))
                             * normalised_ray);
 
-                    dbg!(plane_intersection);
+                    // dbg!(plane_intersection);
 
                     if dragging {
                         if let Some(last) = last_location {

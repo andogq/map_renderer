@@ -157,7 +157,7 @@ fn main() -> osmpbf::Result<()> {
     let scaling = 500_f64 / f64::max(d_lat, d_lon);
 
     // Add all of the lines
-    for way in osm_data.ways.values() {
+    for (i, way) in osm_data.ways.values().enumerate() {
         if let Some(way_type) = way.to_object() {
             let points = way
                 .nodes
@@ -173,6 +173,7 @@ fn main() -> osmpbf::Result<()> {
 
             for renderable in way_type.get_renderables(&points) {
                 let line = Line {
+                    id: i as u32,
                     points: renderable
                         .path
                         .into_iter()

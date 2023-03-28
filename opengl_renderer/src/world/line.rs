@@ -12,6 +12,7 @@ impl VertexData for Vec3 {
 }
 
 pub struct Line {
+    pub id: u32,
     pub points: Vec<Vec3>,
     pub width: f32,
     pub color: Vec3,
@@ -24,6 +25,7 @@ impl VertexData for Line {
             .iter()
             .flat_map(|point| {
                 [
+                    self.id.to_ne_bytes().as_slice(),
                     point.get_bytes().as_slice(),
                     self.width.to_ne_bytes().as_slice(),
                     self.color.get_bytes().as_slice(),

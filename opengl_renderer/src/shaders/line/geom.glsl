@@ -3,6 +3,7 @@
 layout(lines) in;
 
 in VertexData {
+    uint line_id;
     vec3 position;
     float width;
     vec3 color;
@@ -33,36 +34,39 @@ void main() {
 
     int stroke_count = int(ceil(line_length / stroke_length));
 
-    // Generate segments
-    for (int stroke_i = 0; stroke_i <= stroke_count; stroke_i += 1) {
-        vec3 position = in_data[0].position + (stroke_i * stroke_length * normalized_l);
+    if (in_data[0].line_id == in_data[1].line_id) {
+        // Generate segments
+        for (int stroke_i = 0; stroke_i <= stroke_count; stroke_i += 1) {
+            vec3 position = in_data[0].position + (stroke_i * stroke_length * normalized_l);
 
-        if (distance(position, in_data[0].position) > length(in_data[1].position)) {
-            position = in_data[1].position;
-        }
-
-        for (int dir = -1; dir <= 1; dir += 2) {
-            float w = in_data[0].width / 2;
-
-            vec3 p = position
-                // Move perpendicular to line
-                + (l_perp * w * dir);
-
-            // TODO: Give offcut to next connected line
-
-            bool first = stroke_i == 0;
-            bool last = stroke_i == stroke_count;
-            if (first || last) {
-                // Move parallel to line
-                p += (normalized_l * w * (first ? -1 : 1));
+            if (distance(position, in_data[0].position) > length(in_data[1].position)) {
+                position = in_data[1].position;
             }
 
-            gl_Position = pv * vec4(p, 1.0);
-            color = in_data[0].color;
+            for (int dir = -1; dir <= 1; dir += 2) {
+                float w = in_data[0].width / 2;
 
-            EmitVertex();
+                vec3 p = position
+                    // Move perpendicular to line
+                    + (l_perp * w * dir);
+
+                // TODO: Give offcut to next connected line
+
+                bool first = stroke_i == 0;
+                bool last = stroke_i == stroke_count;
+                if (first || last) {
+                    // Move parallel to line
+                    p += (normalized_l * w * (first ? -1 : 1));
+                }
+
+                gl_Position = pv * vec4(p, 1.0);
+
+                color = in_data[0].color;
+
+                EmitVertex();
+            }
+
+            if (stroke_i % 2 == 1) EndPrimitive();
         }
-
-        if (stroke_i % 2 == 1) EndPrimitive();
     }
 }
