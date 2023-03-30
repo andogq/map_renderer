@@ -100,6 +100,7 @@ pub struct ProgramBuilder {
     shaders: Vec<(ShaderType, String)>,
     vertex_format: Vec<VertexFormat>,
     draw_type: Option<DrawType>,
+    buffer_texture: bool,
 }
 impl ProgramBuilder {
     pub fn new() -> Self {
@@ -126,10 +127,15 @@ impl ProgramBuilder {
         self
     }
 
+    pub fn with_buffer_texture(mut self) -> Self {
+        self.buffer_texture = true;
+        self
+    }
+
     pub fn build(self) -> Result<Program, ProgramBuilderError> {
         let gl = self.gl.ok_or(ProgramBuilderError::MissingGl)?;
 
-        let (program, vertex_buffer, vertex_array_object) = {
+        let (program, vertex_buffer, vertex_array_object, texture_buffer) = {
             let gl = gl.borrow();
 
             // Create the opengl program
@@ -186,11 +192,6 @@ impl ProgramBuilder {
                 unsafe { gl.create_buffer() }.map_err(ProgramBuilderError::CreateVertexBuffer)?;
             unsafe { gl.bind_buffer(glow::ARRAY_BUFFER, Some(vertex_buffer)) };
 
-            // Create vertex array object
-            let vertex_array_object = unsafe { gl.create_vertex_array() }
-                .map_err(ProgramBuilderError::CreateVertexArray)?;
-            unsafe { gl.bind_vertex_array(Some(vertex_array_object)) };
-
             // Calculate the step size of vertex, and the offsets for each part of it
             let (vertex_step, offsets) = self.vertex_format.iter().fold(
                 (0, {
@@ -219,7 +220,21 @@ impl ProgramBuilder {
                 }
             }
 
-            (program, vertex_buffer, vertex_array_object)
+            let mut buffer_texture = None;
+            if self.buffer_texture {
+                // Create the vertex buffer
+                buffer_texture = Some(unsafe { gl.create_buffer() }.unwrap());
+
+                // TODO: Bind the texture buffer
+                // gl.tex_buffer(glow::TEXTURE_BUFFER)
+            }
+
+            // Create vertex array object to save state
+            let vertex_array_object = unsafe { gl.create_vertex_array() }
+                .map_err(ProgramBuilderError::CreateVertexArray)?;
+            unsafe { gl.bind_vertex_array(Some(vertex_array_object)) };
+
+            (program, vertex_buffer, vertex_array_object, buffer_texture)
         };
 
         // Build the program
@@ -233,6 +248,7 @@ impl ProgramBuilder {
             uniform_locations: HashMap::new(),
             draw_type: self.draw_type.unwrap_or(DrawType::Triangles),
             draw_arrays: None,
+            texture_buffer,
         })
     }
 }
@@ -272,6 +288,12 @@ where
     }
 }
 
+impl VertexData for Vec<u8> {
+    fn get_bytes(&self) -> Vec<u8> {
+        self.clone()
+    }
+}
+
 pub struct Program {
     program: NativeProgram,
     gl: Rc<RefCell<Context>>,
@@ -282,6 +304,7 @@ pub struct Program {
     uniform_locations: HashMap<String, UniformLocation>,
     draw_type: DrawType,
     draw_arrays: Option<DrawArrays>,
+    texture_buffer: Option<NativeBuffer>,
 }
 
 impl Program {

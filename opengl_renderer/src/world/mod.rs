@@ -1,10 +1,10 @@
 use self::{line::Line, polygon::Polygon};
 use crate::{
-    opengl::{DrawArrays, DrawType, Program, VertexFormat, VertexType},
+    opengl::{DrawArrays, DrawType, OpenGl, Program, VertexData, VertexFormat, VertexType},
     window::{Window, WindowAction, WindowEvent},
 };
 use glam::{Mat4, Vec3, Vec4};
-use std::f32::consts::PI;
+use std::{cell::RefCell, f32::consts::PI, rc::Rc};
 use winit::event::{ElementState, VirtualKeyCode};
 
 pub mod line;
@@ -25,16 +25,115 @@ impl Camera {
     }
 }
 
-pub struct World {
+pub trait CanvasObject {
+    fn get_vertices(&self) -> Vec<Vec3>;
+
+    fn get_stroke_width(&self) -> Option<f32>;
+    fn get_stroke_color(&self) -> Option<Vec3>;
+    fn get_stroke_dash(&self) -> Option<f32>;
+    fn get_fill(&self) -> Option<Vec3>;
+}
+
+struct CanvasProgram<'a> {
+    objects: Vec<Box<dyn CanvasObject + 'a>>,
+}
+
+impl<'a> CanvasProgram<'a> {
+    pub fn new() -> Self {
+        Self {
+            objects: Vec::new(),
+        }
+    }
+
+    pub fn add_object<O>(&mut self, object: O)
+    where
+        O: CanvasObject + 'a,
+    {
+        self.objects.push(Box::new(object));
+    }
+}
+
+impl RenderStep for CanvasProgram<'_> {
+    fn get_vertices(&self) -> Vec<u8> {
+        self.objects
+            .iter()
+            .enumerate()
+            .flat_map(|(id, object)| {
+                // Get the vertices for the object and give them an ID
+                object.get_vertices().into_iter().flat_map(move |vertex| {
+                    [id.to_ne_bytes().as_slice(), vertex.get_bytes().as_slice()].concat()
+                })
+            })
+            .collect()
+    }
+
+    fn build_program(&self, gl: &mut OpenGl) -> Rc<RefCell<Program>> {
+        gl.add_program(
+            Program::from_directory("line")
+                .unwrap()
+                .with_format(&[
+                    // ID
+                    VertexFormat::new(1, VertexType::UInt),
+                    // Vertex
+                    VertexFormat::new(3, VertexType::Float),
+                ])
+                .with_draw_type(DrawType::LineStrip),
+        )
+        .unwrap()
+    }
+
+    fn get_texture_buffer(&self) -> Option<Vec<u8>> {
+        Some(
+            self.objects
+                .iter()
+                .flat_map(|object| {
+                    // TODO: Pack meta bytes here (eg stroke enabled, fill enabled)
+
+                    [
+                        object
+                            .get_stroke_width()
+                            .unwrap_or_default()
+                            .to_ne_bytes()
+                            .as_slice(),
+                        object
+                            .get_stroke_color()
+                            .unwrap_or_default()
+                            .get_bytes()
+                            .as_slice(),
+                        object
+                            .get_stroke_dash()
+                            .unwrap_or_default()
+                            .to_ne_bytes()
+                            .as_slice(),
+                        object.get_fill().unwrap_or_default().get_bytes().as_slice(),
+                    ]
+                    .concat()
+                })
+                .collect(),
+        )
+    }
+}
+
+pub trait RenderStep {
+    fn build_program(&self, gl: &mut OpenGl) -> Rc<RefCell<Program>>;
+    fn get_vertices(&self) -> Vec<u8>;
+    fn get_texture_buffer(&self) -> Option<Vec<u8>> {
+        None
+    }
+}
+
+pub struct World<'a> {
     window: Window,
     projection: Mat4,
     camera: Camera,
+
+    render_steps: Vec<Box<dyn RenderStep + 'a>>,
 
     lines: Vec<Line>,
     polygons: Vec<Polygon>,
 }
 
-impl World {
+impl<'a> World<'a> {
     pub fn with_window(window: Window) -> Self {
         let aspect_ratio = {
             let size = window.get_size();
@@ -45,9 +144,17 @@ impl World {
             window,
             projection: Mat4::perspective_rh(PI / 2.0, aspect_ratio, 1.0, 50.0),
             camera: Camera::new(),
+            render_steps: Vec::new(),
             lines: Vec::new(),
             polygons: Vec::new(),
         }
+    }
+
+    pub fn add_render_step<R>(&mut self, render_step: R)
+    where
+        R: RenderStep + 'a,
+    {
+        self.render_steps.push(Box::new(render_step));
     }
 
     pub fn add_line(&mut self, line: Line) {
@@ -59,6 +166,36 @@ impl World {
     }
 
     pub fn run(mut self) -> ! {
+        let programs = self
+            .render_steps
+            .iter()
+            .map(|render_step| {
+                let program = render_step.build_program(&mut self.window.gl);
+
+                {
+                    // Attach vertices
+                    let mut program = program.borrow_mut();
+                    program
+                        .attach_vertices(render_step.get_vertices(), None)
+                        .unwrap();
+                }
+
+                program
+            })
+            .collect::<Vec<_>>();
+
+        let update_uniforms =
+            |programs: &[Rc<RefCell<Program>>], projection: &Mat4, view: &Mat4| {
+                programs.iter().for_each(|program| {
+                    let mut program = program.borrow_mut();
+                    program.set_uniform("projection", projection).unwrap();
+                    program.set_uniform("view", view).unwrap();
+                });
+            };
+
+        // Provide initial uniforms
+        update_uniforms(programs.as_slice(), &self.projection, &self.camera.view());
+
         let line_program = self
             .window
             .gl
@@ -163,6 +300,8 @@ impl World {
                         .set_uniform("view", &self.camera.view())
                         .unwrap();
 
+                    update_uniforms(programs.as_slice(), &self.projection, &self.camera.view());
+
                     // Trigger redraw
                     return Some(WindowAction::RequestRedraw);
                 }
@@ -232,6 +371,12 @@ impl World {
                             line_program
                                 .set_uniform("view", &self.camera.view())
                                 .unwrap();
+
+                            update_uniforms(
+                                programs.as_slice(),
+                                &self.projection,
+                                &self.camera.view(),
+                            );
                         } else {
                             last_location = Some(plane_intersection);
                         }
@@ -247,6 +392,9 @@ impl World {
                     line_program
                         .set_uniform("view", &self.camera.view())
                         .unwrap();
+
+                    update_uniforms(programs.as_slice(), &self.projection, &self.camera.view());
+
                     return Some(WindowAction::RequestRedraw);
                 }
                 _ => (),

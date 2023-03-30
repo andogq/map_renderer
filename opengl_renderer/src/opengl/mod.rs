@@ -108,6 +108,13 @@ impl OpenGl {
         Ok(program)
     }
 
+    pub fn add_buffer_texture(&self) {
+        let gl = self.gl.borrow();
+
+        // Create the buffer
+        let buffer = unsafe { gl.create_buffer() }.unwrap();
+    }
+
     pub fn render(&self) {
         let gl = self.gl.borrow();
 

@@ -2,6 +2,8 @@ use glam::Vec3;
 
 use crate::opengl::VertexData;
 
+use super::CanvasObject;
+
 pub struct Polygon {
     points: Vec<Vec3>,
     color: Vec3,
@@ -99,5 +101,27 @@ impl VertexData for Polygon {
                 .concat()
             })
             .collect()
+    }
+}
+
+impl CanvasObject for Polygon {
+    fn get_vertices(&self) -> Vec<Vec3> {
+        todo!()
+    }
+
+    fn get_stroke_color(&self) -> Option<Vec3> {
+        todo!()
+    }
+
+    fn get_stroke_dash(&self) -> Option<f32> {
+        todo!()
+    }
+
+    fn get_fill(&self) -> Option<Vec3> {
+        todo!()
+    }
+
+    fn get_stroke_width(&self) -> Option<f32> {
+        todo!()
     }
 }
