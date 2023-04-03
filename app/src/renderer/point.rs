@@ -9,9 +9,3 @@ impl Point {
         Point { x, y }
     }
 }
-
-impl From<Point> for raqote::Point {
-    fn from(value: Point) -> Self {
-        Self::new(value.x, value.y)
-    }
-}

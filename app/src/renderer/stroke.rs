@@ -43,16 +43,3 @@ pub struct Stroke {
     pub color: Color,
     pub style: StrokeStyle,
 }
-
-impl From<&Stroke> for raqote::StrokeStyle {
-    fn from(stroke: &Stroke) -> Self {
-        raqote::StrokeStyle {
-            width: stroke.width,
-            cap: raqote::LineCap::Round,
-            join: raqote::LineJoin::Round,
-            miter_limit: 4.0, // Default according to MDN
-            dash_array: stroke.style.get_dash_array().unwrap_or_default(),
-            dash_offset: 0.0,
-        }
-    }
-}

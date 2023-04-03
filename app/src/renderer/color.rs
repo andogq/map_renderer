@@ -13,18 +13,6 @@ impl Color {
     }
 }
 
-impl From<&Color> for raqote::SolidSource {
-    fn from(color: &Color) -> Self {
-        Self::from_unpremultiplied_argb(0xff, color.r, color.g, color.b)
-    }
-}
-
-impl From<&Color> for raqote::Source<'_> {
-    fn from(color: &Color) -> Self {
-        Self::Solid(color.into())
-    }
-}
-
 impl From<Color> for Vec3 {
     fn from(color: Color) -> Self {
         Vec3::new(
