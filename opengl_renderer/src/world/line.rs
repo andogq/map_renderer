@@ -2,8 +2,6 @@ use glam::Vec3;
 
 use crate::opengl::VertexData;
 
-use super::CanvasObject;
-
 impl VertexData for Vec3 {
     fn get_bytes(&self) -> Vec<u8> {
         self.to_array()
@@ -42,24 +40,24 @@ impl VertexData for Line {
     }
 }
 
-impl CanvasObject for Line {
-    fn get_vertices(&self) -> Vec<Vec3> {
-        self.points.clone()
-    }
-
-    fn get_stroke_color(&self) -> Option<Vec3> {
-        todo!()
-    }
-
-    fn get_stroke_dash(&self) -> Option<f32> {
-        todo!()
-    }
-
-    fn get_fill(&self) -> Option<Vec3> {
-        todo!()
-    }
-
-    fn get_stroke_width(&self) -> Option<f32> {
-        todo!()
-    }
-}
+// impl CanvasObject for Line {
+//     fn get_vertices(&self) -> Vec<Vec3> {
+//         self.points.clone()
+//     }
+//
+//     fn get_stroke_color(&self) -> Option<Vec3> {
+//         Some(self.color)
+//     }
+//
+//     fn get_stroke_dash(&self) -> Option<f32> {
+//         self.stroke_length
+//     }
+//
+//     fn get_fill(&self) -> Option<Vec3> {
+//         Some(self.color)
+//     }
+//
+//     fn get_stroke_width(&self) -> Option<f32> {
+//         Some(self.width)
+//     }
+// }

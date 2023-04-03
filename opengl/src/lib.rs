@@ -196,7 +196,7 @@ impl Context {
     pub fn get_program_info_log(&self, program: Program) -> String {
         // Get the size of the shader info log
         let size = unsafe { self.get_program_parameter(program, ProgramParameter::InfoLogLength) };
-        let mut buffer: Vec<u8> = Vec::with_capacity(size as usize);
+        let mut buffer: Vec<u8> = vec![0; size as usize];
 
         unsafe {
             gl::GetProgramInfoLog(

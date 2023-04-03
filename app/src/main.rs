@@ -6,7 +6,7 @@ use clap::Parser;
 use glam::Vec3;
 use opengl_renderer::{
     window::Window,
-    world::{line::Line, World},
+    world::{line::Line, path::Path, CanvasProgram, Fill, Stroke, World},
 };
 use osm::{Node, Osm};
 use osmpbf::ElementReader;
@@ -147,6 +147,18 @@ fn main() -> osmpbf::Result<()> {
     let d_lat = bounding.max_y - bounding.min_y;
     let d_lon = bounding.max_x - bounding.min_x;
     let scaling = 500_f64 / f64::max(d_lat, d_lon);
+
+    let mut canvas = CanvasProgram::new();
+    canvas.add_object(
+        Path::new(vec![
+            Vec3::new(-10.0, 0.0, 0.0),
+            Vec3::new(10.0, 0.0, 3.0),
+            Vec3::new(5.0, 0.0, -4.0),
+        ])
+        .with_fill(Vec3::new(0.1, 0.9, 0.2))
+        .with_stroke(Stroke::new(2.0, Vec3::new(0.1, 0.5, 0.2))),
+    );
+    world.add_render_step(canvas);
 
     // Add all of the lines
     for (i, way) in osm_data.ways.values().enumerate() {
