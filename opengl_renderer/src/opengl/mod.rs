@@ -1,13 +1,14 @@
-use glow::{Context, HasContext};
+mod program;
+
+use glam::Vec4;
+use opengl::{BufferMask, Context, StringName};
+pub use program::*;
 use std::{
     cell::RefCell,
     error::Error,
     fmt::{Debug, Display},
     rc::Rc,
 };
-
-mod program;
-pub use program::*;
 
 #[derive(Debug)]
 pub enum OpenGlError {
@@ -71,17 +72,17 @@ impl OpenGl {
     pub fn get_info(&self) -> OpenGlInfo {
         let (renderer, version, shading_language_version) = {
             let mut iter = [
-                glow::RENDERER,
-                glow::VERSION,
-                glow::SHADING_LANGUAGE_VERSION,
+                StringName::Renderer,
+                StringName::Version,
+                StringName::ShaderLanguageVersion,
             ]
             .into_iter()
-            .map(|addr| unsafe { self.gl.borrow().get_parameter_string(addr) });
+            .map(|string_name| self.gl.borrow().get_string(string_name));
 
             (
-                iter.next().unwrap(),
-                iter.next().unwrap(),
-                iter.next().unwrap(),
+                iter.next().unwrap().unwrap(),
+                iter.next().unwrap().unwrap(),
+                iter.next().unwrap().unwrap(),
             )
         };
 
@@ -108,31 +109,22 @@ impl OpenGl {
         Ok(program)
     }
 
-    pub fn add_buffer_texture(&self) {
-        let gl = self.gl.borrow();
-
-        // Create the buffer
-        let buffer = unsafe { gl.create_buffer() }.unwrap();
-    }
-
     pub fn render(&self) {
         let gl = self.gl.borrow();
 
-        unsafe {
-            gl.clear_color(1.0, 1.0, 1.0, 1.0);
-            gl.clear(glow::COLOR_BUFFER_BIT);
+        gl.clear_color(Vec4::new(1.0, 1.0, 1.0, 1.0));
+        gl.clear(BufferMask::Color);
 
-            // gl.polygon_mode(
-            //     glow::FRONT_AND_BACK,
-            //     if wireframe { glow::LINE } else { glow::FILL },
-            // );
-            for program in &self.programs {
-                program.borrow().render();
-            }
+        // gl.polygon_mode(
+        //     glow::FRONT_AND_BACK,
+        //     if wireframe { glow::LINE } else { glow::FILL },
+        // );
+        for program in &self.programs {
+            program.borrow().render();
         }
     }
 
     pub fn clear_program(&self) {
-        unsafe { self.gl.borrow().use_program(None) };
+        self.gl.borrow().clear_program();
     }
 }

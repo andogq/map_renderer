@@ -9,6 +9,7 @@ use glutin::{
     surface::{GlSurface, Surface, WindowSurface},
 };
 use glutin_winit::{DisplayBuilder, GlWindow};
+use opengl::Context;
 use raw_window_handle::HasRawWindowHandle;
 use winit::{
     dpi::LogicalSize,
@@ -176,8 +177,7 @@ impl Window {
         .expect("gl_context present");
 
         // Get the OpenGL bindings from the display
-        let gl =
-            unsafe { glow::Context::from_loader_function_cstr(|s| display.get_proc_address(s)) };
+        let context = Context::load(|s| display.get_proc_address(s));
 
         Self {
             event_loop: Some(event_loop),
@@ -185,7 +185,7 @@ impl Window {
             display,
             gl_surface,
             gl_context,
-            gl: OpenGl::new(gl),
+            gl: OpenGl::new(context),
         }
     }
 

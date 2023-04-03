@@ -10,14 +10,6 @@ use opengl_renderer::{
 };
 use osm::{Node, Osm};
 use osmpbf::ElementReader;
-use renderer::render;
-use softbuffer::GraphicsContext;
-use winit::{
-    dpi::{LogicalSize, PhysicalSize},
-    event::{ElementState, Event, KeyboardInput, VirtualKeyCode, WindowEvent},
-    event_loop::EventLoop,
-    window::WindowBuilder,
-};
 
 use crate::renderer::Point;
 

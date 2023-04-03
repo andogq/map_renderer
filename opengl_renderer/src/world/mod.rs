@@ -213,6 +213,34 @@ impl<'a> World<'a> {
             )
             .unwrap();
 
+        let simple_program = self
+            .window
+            .gl
+            .add_program(
+                Program::from_directory("simple")
+                    .unwrap()
+                    .with_draw_type(DrawType::Points)
+                    .with_format(&[VertexFormat::new(3, VertexType::Float)]),
+            )
+            .unwrap();
+
+        {
+            let mut simple_program = simple_program.borrow_mut();
+            simple_program
+                .attach_vertices(
+                    [
+                        Vec3::new(0.5, 0.5, 0.5),
+                        Vec3::new(-0.5, -0.5, -0.5),
+                        Vec3::new(0.0, 0.8, 0.5),
+                    ]
+                    .as_slice(),
+                    None,
+                )
+                .unwrap();
+
+            simple_program.set_uniform("blue", &0.8f32).unwrap();
+        }
+
         let polygon_program = self
             .window
             .gl
@@ -300,7 +328,7 @@ impl<'a> World<'a> {
                         .set_uniform("view", &self.camera.view())
                         .unwrap();
 
-                    update_uniforms(programs.as_slice(), &self.projection, &self.camera.view());
+                    // update_uniforms(programs.as_slice(), &self.projection, &self.camera.view());
 
                     // Trigger redraw
                     return Some(WindowAction::RequestRedraw);

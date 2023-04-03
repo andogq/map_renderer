@@ -1,60 +1,23 @@
-use glam::Mat4;
-use glow::{
-    Context, HasContext, NativeBuffer, NativeProgram, NativeShader, NativeVertexArray,
-    UniformLocation, ARRAY_BUFFER,
-};
-use std::{
-    cell::RefCell,
-    collections::HashMap,
-    error::Error,
-    fmt::Display,
-    fs::{self, FileType},
-    path::{Path, PathBuf},
-    rc::Rc,
-};
-
 use super::OpenGlError;
-
-pub enum ShaderType {
-    Vertex,
-    Geometry,
-    Fragment,
-}
-impl From<ShaderType> for u32 {
-    fn from(ty: ShaderType) -> Self {
-        match ty {
-            ShaderType::Vertex => glow::VERTEX_SHADER,
-            ShaderType::Geometry => glow::GEOMETRY_SHADER,
-            ShaderType::Fragment => glow::FRAGMENT_SHADER,
-        }
-    }
-}
-impl TryFrom<&str> for ShaderType {
-    type Error = ();
-
-    fn try_from(value: &str) -> Result<Self, Self::Error> {
-        match value {
-            "vert" | "vertex" => Ok(Self::Vertex),
-            "geom" | "geometry" => Ok(Self::Geometry),
-            "frag" | "fragment" => Ok(Self::Fragment),
-            _ => Err(()),
-        }
-    }
-}
+use glam::Mat4;
+use opengl::{Buffer, BufferType, Capability, Context, Location, ShaderType, VertexArrayObject};
+use std::{
+    cell::RefCell, collections::HashMap, error::Error, fmt::Display, fs, path::Path, rc::Rc,
+};
 
 pub trait UniformValue {
-    unsafe fn set_uniform(&self, gl: &Context, location: &UniformLocation);
+    fn set_uniform(&self, gl: &Context, location: Location);
 }
 
 impl UniformValue for f32 {
-    unsafe fn set_uniform(&self, gl: &Context, location: &UniformLocation) {
-        gl.uniform_1_f32(Some(location), *self)
+    fn set_uniform(&self, gl: &Context, location: Location) {
+        gl.uniform_f32(location, *self)
     }
 }
 
 impl UniformValue for Mat4 {
-    unsafe fn set_uniform(&self, gl: &Context, location: &UniformLocation) {
-        gl.uniform_matrix_4_f32_slice(Some(location), false, &self.to_cols_array())
+    fn set_uniform(&self, gl: &Context, location: Location) {
+        gl.uniform_mat4(location, self)
     }
 }
 
@@ -65,13 +28,13 @@ pub enum DrawType {
     Lines,
     LineStrip,
 }
-impl From<DrawType> for u32 {
+impl From<DrawType> for opengl::DrawType {
     fn from(value: DrawType) -> Self {
         match value {
-            DrawType::Triangles => glow::TRIANGLES,
-            DrawType::Points => glow::POINTS,
-            DrawType::Lines => glow::LINES,
-            DrawType::LineStrip => glow::LINE_STRIP,
+            DrawType::Triangles => opengl::DrawType::Triangles,
+            DrawType::Points => opengl::DrawType::Points,
+            DrawType::Lines => opengl::DrawType::Lines,
+            DrawType::LineStrip => opengl::DrawType::LineStrip,
         }
     }
 }
@@ -80,6 +43,7 @@ impl From<DrawType> for u32 {
 pub enum ProgramBuilderError {
     IoError(std::io::Error),
     MissingGl,
+    OpenGlError(opengl::OpenGlError),
     CreateProgram(String),
     CreateShader(String),
     ShaderCompile(String),
@@ -139,32 +103,31 @@ impl ProgramBuilder {
             let gl = gl.borrow();
 
             // Create the opengl program
-            let program =
-                unsafe { gl.create_program() }.map_err(ProgramBuilderError::CreateProgram)?;
+            let program = gl
+                .create_program()
+                .map_err(ProgramBuilderError::OpenGlError)?;
 
             // Build the shaders
             let shaders = self
                 .shaders
                 .into_iter()
                 .map(|(shader_type, source)| {
-                    unsafe { gl.create_shader(shader_type.into()) }
-                        .map_err(ProgramBuilderError::CreateShader)
+                    gl.create_shader(shader_type)
+                        .map_err(ProgramBuilderError::OpenGlError)
                         .and_then(|shader| {
-                            unsafe {
-                                // Add source and compile
-                                gl.shader_source(shader, &source);
-                                gl.compile_shader(shader);
+                            // Add source and compile
+                            gl.shader_source(shader, &source);
+                            gl.compile_shader(shader);
 
-                                // Check for errors
-                                if !gl.get_shader_compile_status(shader) {
-                                    return Err(ProgramBuilderError::ShaderCompile(
-                                        gl.get_shader_info_log(shader),
-                                    ));
-                                }
-
-                                // Add shader to program
-                                gl.attach_shader(program, shader);
+                            // Check for errors
+                            if !gl.get_shader_compile_status(shader) {
+                                return Err(ProgramBuilderError::ShaderCompile(
+                                    gl.get_shader_info_log(shader),
+                                ));
                             }
+
+                            // Add shader to program
+                            gl.attach_shader(program, shader);
 
                             Ok(shader)
                         })
@@ -172,25 +135,24 @@ impl ProgramBuilder {
                 .collect::<Result<Vec<_>, ProgramBuilderError>>()?;
 
             // Link the program
-            unsafe { gl.link_program(program) };
-            if unsafe { !gl.get_program_link_status(program) } {
-                return Err(ProgramBuilderError::ProgramLink(unsafe {
-                    gl.get_program_info_log(program)
-                }));
+            gl.link_program(program);
+            if !gl.get_program_link_status(program) {
+                return Err(ProgramBuilderError::ProgramLink(
+                    gl.get_program_info_log(program),
+                ));
             }
 
             // Clean up shaders
             for shader in shaders {
-                unsafe {
-                    gl.detach_shader(program, shader);
-                    gl.delete_shader(shader);
-                }
+                gl.detach_shader(program, shader);
+                gl.delete_shader(shader);
             }
 
             // Create the vertex buffer object and bind it so it can be detected by VAO
-            let vertex_buffer =
-                unsafe { gl.create_buffer() }.map_err(ProgramBuilderError::CreateVertexBuffer)?;
-            unsafe { gl.bind_buffer(glow::ARRAY_BUFFER, Some(vertex_buffer)) };
+            let vertex_buffer = gl
+                .create_buffer()
+                .map_err(ProgramBuilderError::OpenGlError)?;
+            gl.bind_buffer(BufferType::ArrayBuffer, vertex_buffer);
 
             // Calculate the step size of vertex, and the offsets for each part of it
             let (vertex_step, offsets) = self.vertex_format.iter().fold(
@@ -205,34 +167,32 @@ impl ProgramBuilder {
                 },
             );
 
+            // Create vertex array object to save state
+            let vertex_array_object = gl
+                .create_vertex_array()
+                .map_err(ProgramBuilderError::OpenGlError)?;
+            gl.bind_vertex_array(vertex_array_object);
+
             // Configure all of the attributes
             for (i, (format, offset)) in self.vertex_format.iter().zip(offsets).enumerate() {
-                unsafe {
-                    gl.enable_vertex_attrib_array(i as u32);
-                    gl.vertex_attrib_pointer_f32(
-                        i as u32,
-                        format.count as i32,
-                        (&format.vertex_type).into(),
-                        false,
-                        vertex_step as i32,
-                        offset as i32,
-                    );
-                }
+                gl.enable_vertex_attribute_array(i as u32);
+                gl.vertex_attribute_pointer_f32(
+                    i as u32,
+                    format.count,
+                    (&format.vertex_type).into(),
+                    false,
+                    vertex_step,
+                    offset,
+                );
             }
 
             let mut buffer_texture = None;
             if self.buffer_texture {
                 // Create the vertex buffer
-                buffer_texture = Some(unsafe { gl.create_buffer() }.unwrap());
+                buffer_texture = Some(gl.create_buffer().unwrap());
 
                 // TODO: Bind the texture buffer
-                // gl.tex_buffer(glow::TEXTURE_BUFFER)
             }
-
-            // Create vertex array object to save state
-            let vertex_array_object = unsafe { gl.create_vertex_array() }
-                .map_err(ProgramBuilderError::CreateVertexArray)?;
-            unsafe { gl.bind_vertex_array(Some(vertex_array_object)) };
 
             (program, vertex_buffer, vertex_array_object, buffer_texture)
         };
@@ -295,16 +255,16 @@ impl VertexData for Vec<u8> {
 }
 
 pub struct Program {
-    program: NativeProgram,
+    program: opengl::Program,
     gl: Rc<RefCell<Context>>,
-    vertex_buffer: NativeBuffer,
-    vertex_array_object: NativeVertexArray,
+    vertex_buffer: Buffer,
+    vertex_array_object: VertexArrayObject,
     vertex_count: Option<u32>,
     vertex_format: Vec<VertexFormat>,
-    uniform_locations: HashMap<String, UniformLocation>,
+    uniform_locations: HashMap<String, Location>,
     draw_type: DrawType,
     draw_arrays: Option<DrawArrays>,
-    texture_buffer: Option<NativeBuffer>,
+    texture_buffer: Option<Buffer>,
 }
 
 impl Program {
@@ -328,7 +288,13 @@ impl Program {
             {
                 // Check if valid file type
                 let stripped_name = entry.file_name().to_string_lossy().replace(".glsl", "");
-                if let Ok(shader_type) = ShaderType::try_from(stripped_name.as_str()) {
+
+                if let Some(shader_type) = match stripped_name.as_str() {
+                    "vert" | "vertex" => Some(ShaderType::Vertex),
+                    "geom" | "geometry" => Some(ShaderType::Geometry),
+                    "frag" | "fragment" => Some(ShaderType::Fragment),
+                    _ => None,
+                } {
                     // Read file contents
                     let source =
                         fs::read_to_string(entry.path()).map_err(ProgramBuilderError::IoError)?;
@@ -343,26 +309,26 @@ impl Program {
 
     pub fn use_program(&self) {
         let gl = self.gl.borrow();
-        unsafe { gl.use_program(Some(self.program)) };
+        gl.use_program(self.program);
     }
 
     pub fn render(&self) {
         self.use_program();
 
         let gl = self.gl.borrow();
-        unsafe { gl.enable(glow::PROGRAM_POINT_SIZE) };
+        gl.enable(Capability::ProgramPointSize);
         if let Some(vertex_count) = self.vertex_count {
             // Rebind vertex array
-            unsafe { gl.bind_vertex_array(Some(self.vertex_array_object)) };
+            gl.bind_vertex_array(self.vertex_array_object);
 
             if let Some(DrawArrays { first, count }) = self.draw_arrays.as_ref() {
                 // glow doesn't support glMultiDrawArrays, but *alegedly* this has the same
                 // performance impact
                 for (&first, &count) in first.iter().zip(count.iter()) {
-                    unsafe { gl.draw_arrays(self.draw_type.into(), first as i32, count as i32) };
+                    gl.draw_arrays(self.draw_type.into(), first, count);
                 }
             } else {
-                unsafe { gl.draw_arrays(self.draw_type.into(), 0, vertex_count as i32) };
+                gl.draw_arrays(self.draw_type.into(), 0, vertex_count);
             }
         }
     }
@@ -378,19 +344,15 @@ impl Program {
 
         let vertices = vertices.get_bytes();
 
-        // Construct the raw pointer
-        let vertices_u8 = unsafe {
-            core::slice::from_raw_parts(
-                vertices.as_ptr() as *const u8,
-                vertices.len() * core::mem::size_of::<f32>(),
-            )
-        };
-
         // Bind vertex buffer and add data
-        unsafe {
-            gl.bind_buffer(glow::ARRAY_BUFFER, Some(self.vertex_buffer));
-            gl.buffer_data_u8_slice(glow::ARRAY_BUFFER, vertices_u8, glow::STATIC_DRAW);
-        };
+        gl.bind_vertex_array(self.vertex_array_object);
+        gl.bind_buffer(BufferType::ArrayBuffer, self.vertex_buffer);
+        gl.buffer_data_u8_slice(
+            BufferType::ArrayBuffer,
+            // vertices_u8,
+            &vertices,
+            opengl::Usage::StaticDraw,
+        );
 
         // TODO: Will change when take other slices
         self.vertex_count = Some(
@@ -398,7 +360,7 @@ impl Program {
                 / self
                     .vertex_format
                     .iter()
-                    .fold(0, |total_size, format| total_size + format.count),
+                    .fold(0, |total_size, format| total_size + format.size()),
         );
 
         self.draw_arrays = draw_arrays;
@@ -417,7 +379,7 @@ impl Program {
 
         let location = if let Some(location) = self.uniform_locations.get(name) {
             location
-        } else if let Some(location) = unsafe { gl.get_uniform_location(self.program, name) } {
+        } else if let Some(location) = gl.get_uniform_location(self.program, name) {
             // Use entry API to get a reference owned by the hashmap, like in the previous branch
             self.uniform_locations
                 .entry(name.to_string())
@@ -426,38 +388,35 @@ impl Program {
             return Err(OpenGlError::UniformNotFound(name.to_string()));
         };
 
-        unsafe { value.set_uniform(&gl, location) };
+        value.set_uniform(&gl, *location);
 
         Ok(())
     }
 }
 
-#[derive(Clone, Copy)]
+#[derive(Debug, Clone, Copy)]
 pub enum VertexType {
     Float,
     UInt,
-    Bool,
 }
 impl VertexType {
     pub fn size(&self) -> u32 {
         match self {
             VertexType::Float => 4,
             VertexType::UInt => 4,
-            VertexType::Bool => 4,
         }
     }
 }
-impl From<&VertexType> for u32 {
+impl From<&VertexType> for opengl::DataType {
     fn from(vertex_type: &VertexType) -> Self {
         match vertex_type {
-            VertexType::Float => glow::FLOAT,
-            VertexType::UInt => glow::UNSIGNED_INT,
-            VertexType::Bool => glow::BOOL,
+            VertexType::Float => opengl::DataType::Float,
+            VertexType::UInt => opengl::DataType::UnsignedInt,
         }
     }
 }
 
-#[derive(Clone, Copy)]
+#[derive(Debug, Clone, Copy)]
 pub struct VertexFormat {
     count: u32,
     vertex_type: VertexType,
