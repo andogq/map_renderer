@@ -1,6 +1,6 @@
 use glam::Vec3;
 
-use crate::opengl::VertexData;
+use crate::ogl::VertexData;
 
 impl VertexData for Vec3 {
     fn get_bytes(&self) -> Vec<u8> {

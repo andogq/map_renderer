@@ -1,4 +1,5 @@
 mod program;
+pub mod texture_buffer;
 
 use glam::Vec4;
 use opengl::{BufferMask, Context, StringName};
@@ -9,6 +10,8 @@ use std::{
     fmt::{Debug, Display},
     rc::Rc,
 };
+
+use self::texture_buffer::{TextureBuffer, TextureBufferBuilder, TextureBufferBuilderError};
 
 #[derive(Debug)]
 pub enum OpenGlError {
@@ -122,6 +125,13 @@ impl OpenGl {
         for program in &self.programs {
             program.borrow().render();
         }
+    }
+
+    pub fn create_texture(
+        &self,
+        builder: TextureBufferBuilder,
+    ) -> Result<TextureBuffer, TextureBufferBuilderError> {
+        builder.build(self.gl.clone())
     }
 
     pub fn clear_program(&self) {

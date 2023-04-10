@@ -6,8 +6,10 @@ use gl::types::GLuint;
 pub use types::*;
 
 use glam::{Mat4, Vec4};
+use std::error::Error;
 use std::ffi::{self, c_void, CString};
 use std::ffi::{c_char, CStr};
+use std::fmt::Display;
 use std::ptr;
 
 #[derive(Debug)]
@@ -16,6 +18,17 @@ pub enum OpenGlError {
     GetString,
     VertexArrayCreation,
 }
+impl Display for OpenGlError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::ShaderCreation => write!(f, "Problem creating a shader"),
+            Self::GetString => write!(f, "Problem getting a string"),
+            Self::VertexArrayCreation => write!(f, "Probem creating vertex array"),
+        }
+    }
+}
+impl Error for OpenGlError {}
+
 type Result<T> = std::result::Result<T, OpenGlError>;
 
 pub struct Context(());
@@ -87,6 +100,16 @@ impl Context {
         }
     }
 
+    pub fn create_texture(&self) -> Result<Texture> {
+        let mut texture: GLuint = 0;
+        unsafe { gl::GenTextures(1, &mut texture as *mut GLuint) };
+
+        match texture {
+            0 => Err(OpenGlError::VertexArrayCreation),
+            texture => Ok(Texture(texture)),
+        }
+    }
+
     // (Color) Buffer handling
     pub fn clear_color(&self, color: Vec4) {
         unsafe { gl::ClearColor(color.x, color.y, color.z, color.w) }
@@ -118,6 +141,10 @@ impl Context {
                 value.to_cols_array().as_ptr(),
             )
         };
+    }
+
+    pub fn uniform_i32(&self, location: Location, value: i32) {
+        unsafe { gl::Uniform1i(location.into(), value) };
     }
 
     // Shaders
@@ -261,5 +288,28 @@ impl Context {
     // Vertex Array
     pub fn bind_vertex_array(&self, vertex_array: VertexArrayObject) {
         unsafe { gl::BindVertexArray(vertex_array.into()) };
+    }
+
+    // Textures
+    pub fn texture_buffer(&self, internal_format: ImageFormat, buffer: Buffer) {
+        unsafe {
+            gl::TexBuffer(
+                BufferType::TextureBuffer.into(),
+                internal_format.into(),
+                buffer.into(),
+            )
+        };
+    }
+
+    pub fn active_texture(&self, texture_i: u32) {
+        unsafe { gl::ActiveTexture(gl::TEXTURE0 + texture_i) };
+    }
+
+    pub fn get_texture_offset(&self) -> u32 {
+        gl::TEXTURE0
+    }
+
+    pub fn bind_texture(&self, target: TextureTarget, texture: Texture) {
+        unsafe { gl::BindTexture(target.into(), texture.into()) };
     }
 }

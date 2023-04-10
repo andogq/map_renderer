@@ -1,6 +1,6 @@
 use std::time::{Duration, Instant};
 
-use crate::opengl::OpenGl;
+use crate::ogl::OpenGl;
 use glutin::{
     config::ConfigTemplateBuilder,
     context::{ContextAttributesBuilder, PossiblyCurrentContext},

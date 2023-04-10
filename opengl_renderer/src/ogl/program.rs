@@ -1,4 +1,4 @@
-use super::OpenGlError;
+use super::{texture_buffer::TextureBuffer, OpenGlError};
 use glam::Mat4;
 use opengl::{Buffer, BufferType, Capability, Context, Location, ShaderType, VertexArrayObject};
 use std::{
@@ -64,7 +64,6 @@ pub struct ProgramBuilder {
     shaders: Vec<(ShaderType, String)>,
     vertex_format: Vec<VertexFormat>,
     draw_type: Option<DrawType>,
-    buffer_texture: bool,
 }
 impl ProgramBuilder {
     pub fn new() -> Self {
@@ -91,15 +90,10 @@ impl ProgramBuilder {
         self
     }
 
-    pub fn with_buffer_texture(mut self) -> Self {
-        self.buffer_texture = true;
-        self
-    }
-
     pub fn build(self) -> Result<Program, ProgramBuilderError> {
         let gl = self.gl.ok_or(ProgramBuilderError::MissingGl)?;
 
-        let (program, vertex_buffer, vertex_array_object, texture_buffer) = {
+        let (program, vertex_buffer, vertex_array_object) = {
             let gl = gl.borrow();
 
             // Create the opengl program
@@ -186,15 +180,7 @@ impl ProgramBuilder {
                 );
             }
 
-            let mut buffer_texture = None;
-            if self.buffer_texture {
-                // Create the vertex buffer
-                buffer_texture = Some(gl.create_buffer().unwrap());
-
-                // TODO: Bind the texture buffer
-            }
-
-            (program, vertex_buffer, vertex_array_object, buffer_texture)
+            (program, vertex_buffer, vertex_array_object)
         };
 
         // Build the program
@@ -208,7 +194,7 @@ impl ProgramBuilder {
             uniform_locations: HashMap::new(),
             draw_type: self.draw_type.unwrap_or(DrawType::Triangles),
             draw_arrays: None,
-            texture_buffer,
+            texture_buffer: None,
         })
     }
 }
@@ -264,7 +250,7 @@ pub struct Program {
     uniform_locations: HashMap<String, Location>,
     draw_type: DrawType,
     draw_arrays: Option<DrawArrays>,
-    texture_buffer: Option<Buffer>,
+    texture_buffer: Option<Rc<TextureBuffer>>,
 }
 
 impl Program {
@@ -321,6 +307,19 @@ impl Program {
             // Rebind vertex array
             gl.bind_vertex_array(self.vertex_array_object);
 
+            // Bind buffer texture
+            if let (Some(texture_buffer), Some(sampler_location)) = (
+                &self.texture_buffer,
+                gl.get_uniform_location(self.program, "path_data"),
+            ) {
+                // TODO: Work out better way to deal with this
+                let texture_number = 0;
+
+                gl.active_texture(texture_number);
+                texture_buffer.bind(texture_number);
+                gl.uniform_i32(sampler_location, texture_number as i32);
+            }
+
             if let Some(DrawArrays { first, count }) = self.draw_arrays.as_ref() {
                 // glow doesn't support glMultiDrawArrays, but *alegedly* this has the same
                 // performance impact
@@ -366,6 +365,10 @@ impl Program {
         self.draw_arrays = draw_arrays;
 
         Ok(())
+    }
+
+    pub fn attach_texture_buffer(&mut self, texture_buffer: Rc<TextureBuffer>) {
+        self.texture_buffer = Some(texture_buffer);
     }
 
     pub fn set_uniform(

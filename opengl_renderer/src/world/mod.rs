@@ -1,9 +1,13 @@
 use self::{line::Line, polygon::Polygon};
 use crate::{
-    opengl::{DrawArrays, DrawType, OpenGl, Program, VertexData, VertexFormat, VertexType},
+    ogl::{
+        texture_buffer::TextureBufferBuilder, DrawType, OpenGl, Program, VertexData, VertexFormat,
+        VertexType,
+    },
     window::{Window, WindowAction, WindowEvent},
 };
 use glam::{Mat4, Vec3, Vec4};
+use opengl::ImageFormat;
 use std::{cell::RefCell, f32::consts::PI, rc::Rc};
 use winit::event::{ElementState, VirtualKeyCode};
 
@@ -26,7 +30,7 @@ impl Camera {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Default)]
 pub struct Stroke {
     width: f32,
     dash: Option<f32>,
@@ -57,7 +61,7 @@ pub fn point_in_triangle(p: Vec3, a: Vec3, b: Vec3, c: Vec3) -> bool {
     w1 >= 0.0 && w2 >= 0.0 && (w1 + w2) <= 1.0
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Default)]
 pub struct Fill {
     indexes: Vec<usize>,
     fill: Vec3,
@@ -200,7 +204,7 @@ impl RenderStep for CanvasProgram<'_> {
 
         [
             ("canvas_fill", DrawType::Triangles),
-            ("canvas_outline", DrawType::LineStrip),
+            // ("canvas_outline", DrawType::LineStrip),
         ]
         .into_iter()
         .map(|(directory, draw_type)| {
@@ -216,35 +220,43 @@ impl RenderStep for CanvasProgram<'_> {
     }
 
     fn get_texture_buffer(&self) -> Option<Vec<u8>> {
-        None
-        // Some(
-        // self.objects
-        //     .iter()
-        //     .flat_map(|object| {
-        // // TODO: Pack meta bytes here (eg stroke enabled, fill enabled)
+        Some(
+            self.objects
+                .iter()
+                .flat_map(|object| {
+                    let stroke = object.get_stroke();
+                    let fill = object.get_fill();
 
-        // [
-        // object
-        //     .get_stroke_width()
-        //     .unwrap_or_default()
-        //     .to_ne_bytes()
-        //     .as_slice(),
-        // object
-        //     .get_stroke_color()
-        //     .unwrap_or_default()
-        //     .get_bytes()
-        //     .as_slice(),
-        // object
-        //     .get_stroke_dash()
-        //     .unwrap_or_default()
-        //     .to_ne_bytes()
-        //     .as_slice(),
-        // object.get_fill().unwrap_or_default().get_bytes().as_slice(),
-        //     ]
-        //     .concat()
-        // })
-        // .collect(),
-        // )
+                    [
+                        {
+                            [stroke.is_some(), fill.is_some()]
+                                .into_iter()
+                                .enumerate()
+                                .fold(0u32, |packed, (i, value)| (packed << 1) | (value as u32))
+                                .to_ne_bytes()
+                                .as_slice()
+                        },
+                        {
+                            let stroke = stroke.unwrap_or_default();
+
+                            [
+                                stroke.color.get_bytes().as_slice(),
+                                stroke.width.to_ne_bytes().as_slice(),
+                                stroke.dash.unwrap_or_default().to_ne_bytes().as_slice(),
+                            ]
+                            .concat()
+                            .as_slice()
+                        },
+                        {
+                            let fill = fill.unwrap_or_default();
+
+                            fill.fill.get_bytes().as_slice()
+                        },
+                    ]
+                    .concat()
+                })
+                .collect(),
+        )
     }
 }
 
@@ -307,10 +319,28 @@ impl<'a> World<'a> {
                 let programs = render_step.build_programs(&mut self.window.gl);
                 let vertices = render_step.get_vertices();
 
+                let texture_buffer = render_step.get_texture_buffer().map(|data| {
+                    let texture_buffer = self
+                        .window
+                        .gl
+                        .create_texture(TextureBufferBuilder::new().with_format(ImageFormat::R32F))
+                        .unwrap();
+
+                    texture_buffer.set_data(&data);
+
+                    Rc::new(texture_buffer)
+                });
+
                 for (program, vertices) in programs.iter().zip(vertices) {
-                    // Attach vertices
                     let mut program = program.borrow_mut();
+
+                    // Attach vertices
                     program.attach_vertices(vertices, None).unwrap();
+
+                    if let Some(texture_buffer) = texture_buffer.as_ref() {
+                        // Attach texture buffer
+                        program.attach_texture_buffer(texture_buffer.clone());
+                    }
                 }
 
                 programs

@@ -4,7 +4,7 @@ use crate::world::polygon::Polygon;
 use crate::world::World;
 use glam::Vec3;
 
-mod opengl;
+mod ogl;
 mod window;
 mod world;
 

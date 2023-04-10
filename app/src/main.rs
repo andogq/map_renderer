@@ -155,7 +155,7 @@ fn main() -> osmpbf::Result<()> {
             Vec3::new(10.0, 0.0, 3.0),
             Vec3::new(5.0, 0.0, -4.0),
         ])
-        .with_fill(Vec3::new(0.1, 0.9, 0.2))
+        .with_fill(Vec3::new(0.0, 0.9, 0.2))
         .with_stroke(Stroke::new(2.0, Vec3::new(0.1, 0.5, 0.2))),
     );
     world.add_render_step(canvas);
@@ -191,7 +191,7 @@ fn main() -> osmpbf::Result<()> {
                     stroke_length: None,
                 };
 
-                world.add_line(line);
+                // world.add_line(line);
             }
         }
     }

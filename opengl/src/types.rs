@@ -17,3 +17,4 @@ gl_wrapper!(Program(GLuint));
 gl_wrapper!(Shader(GLuint));
 gl_wrapper!(Buffer(GLuint));
 gl_wrapper!(VertexArrayObject(GLuint));
+gl_wrapper!(Texture(GLuint));

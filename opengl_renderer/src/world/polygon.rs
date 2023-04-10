@@ -1,8 +1,6 @@
 use glam::Vec3;
 
-use crate::opengl::VertexData;
-
-use super::CanvasObject;
+use crate::ogl::VertexData;
 
 pub struct Polygon {
     points: Vec<Vec3>,
