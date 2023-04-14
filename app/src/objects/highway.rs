@@ -40,11 +40,11 @@ impl Object for Highway {
         vec![
             Path::new(points.iter().map(|p| p.into()).collect()).with_stroke({
                 let width = match self {
-                    Self::Motorway => 4.0,
-                    Self::Trunk | Self::Primary | Self::Secondary | Self::Tertiary => 2.0,
-                    Self::Service => 0.75,
-                    Self::Footway | Self::Path => 0.5,
-                    _ => 1.0,
+                    Self::Motorway => 0.5,
+                    Self::Trunk | Self::Primary | Self::Secondary | Self::Tertiary => 0.4,
+                    Self::Service => 0.25,
+                    Self::Footway | Self::Path => 0.075,
+                    _ => 0.15,
                 };
                 let color = match self {
                     Self::Motorway => Vec3::new(223.0, 46.0, 107.0) / 255.0,
@@ -56,12 +56,12 @@ impl Object for Highway {
                     _ => Vec3::new(169.0, 175.0, 182.0) / 255.0,
                 };
                 let dash = match self {
-                    Self::Footway | Self::Path => Some(0.2),
+                    Self::Footway | Self::Path => Some(0.05),
                     Self::Motorway
                     | Self::Trunk
                     | Self::Primary
                     | Self::Secondary
-                    | Self::Tertiary => Some(0.5),
+                    | Self::Tertiary => Some(0.1),
                     _ => None,
                 };
 

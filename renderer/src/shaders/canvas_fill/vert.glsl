@@ -9,7 +9,7 @@ uniform mat4 view;
 uniform samplerBuffer path_data;
 
 // Number of 32 bit floats per each path data struct
-const uint PATH_DATA_SIZE = 7;
+const uint PATH_DATA_SIZE = 9;
 
 out VertexData {
     vec3 color;
@@ -34,8 +34,8 @@ bool get_bit(uint n, uint bit_number) {
 
 struct PathData {
     // Metadata
-    bool has_stroke;
     bool has_fill;
+    bool has_stroke;
 
     // Stroke
     vec3 stroke_color;
@@ -51,8 +51,8 @@ PathData get_path(uint path) {
 
     uint metadata = floatBitsToUint(get(base));
 
-    bool has_stroke = get_bit(metadata, 1);
     bool has_fill = get_bit(metadata, 0);
+    bool has_stroke = get_bit(metadata, 1);
 
     vec3 stroke_color = get_vec3(base + 1);
     float stroke_width = get(base + 4);
@@ -61,8 +61,8 @@ PathData get_path(uint path) {
     vec3 fill_color = get_vec3(base + 6);
 
     return PathData (
-        has_stroke,
         has_fill,
+        has_stroke,
         stroke_color,
         stroke_width,
         stroke_dash,
@@ -77,7 +77,11 @@ void main() {
 
     PathData path = get_path(line_id);
 
-    if (path.has_fill) {
-        out_data.color = path.stroke_color;
+    // out_data.color = vec3(1.0, 0.0, 0.0);
+
+    // out_data.color = vec4(path.has_stroke ? 1.0 : 0.0, path.has_fill ? 1.0 : 0.0, 0.0);
+    if (path.has_stroke) {
+        out_data.color = path.fill_color;
+        // out_data.color = vec3(1.0, 0.0, 0.0);
     }
 }

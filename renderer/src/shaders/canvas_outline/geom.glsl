@@ -18,7 +18,7 @@ uniform mat4 view;
 uniform samplerBuffer path_data;
 
 // Number of 32 bit floats per each path data struct
-const uint PATH_DATA_SIZE = 7;
+const uint PATH_DATA_SIZE = 9;
 
 out VertexData {
     vec3 color;

@@ -53,7 +53,7 @@ impl<'a> Renderer<'a> {
 
         Self {
             window,
-            projection: Mat4::perspective_rh(PI / 2.0, aspect_ratio, 1.0, 50.0),
+            projection: Mat4::perspective_rh(PI / 2.0, aspect_ratio, 0.001, 500.0),
             camera: Camera::new(),
             render_steps: Vec::new(),
         }

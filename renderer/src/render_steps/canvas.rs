@@ -70,66 +70,10 @@ impl Stroke {
 }
 
 pub fn point_in_triangle(p: Vec3, a: Vec3, b: Vec3, c: Vec3) -> bool {
-    // https://www.youtube.com/watch?v=HYAgJN3x4GA
-    // let w1 = ((a.x * (c.z - a.z)) + ((p.z - a.z) * (c.x - a.x)) - (p.x * (c.z - a.z)))
-    //     / (((b.z - a.z) * (b.x - a.x)) - ((b.x - a.x) * (c.z - a.z)));
-    // let w2 = (p.z - a.z - (w1 * (b.z - a.z))) / (c.z - a.z);
-    //
-    // w1 >= 0.0 && w2 >= 0.0 && (w1 + w2) <= 1.0
-
-    // let v = p - a;
-    //
-    // let va = p - a;
-    // let ab = b - a;
-    // let v_ab = va.dot(ab.normalize()) * ab.normalize();
-    // let ab_prop = v_ab.length() / ab.length();
-    //
-    // let vb = p - b;
-    // let bc = c - b;
-    // let v_bc = vb.dot(bc.normalize()) * bc.normalize();
-    // let bc_prop = v_bc.length() / bc.length();
-    //
-    // let vc = p - c;
-    // let ca = a - c;
-    // let v_ca = vc.dot(ca.normalize()) * ca.normalize();
-    // let ca_prop = v_ca.length() / ca.length();
-    //
-    // ab_prop <= 1.0
-    //     && bc_prop <= 1.0
-    //     && ca_prop <= 1.0
-    //     && ab.signum() == v_ab.signum()
-    //     && bc.signum() == v_bc.signum()
-    //     && ca.signum() == v_ca.signum()
-
-    // let ac = c - a;
-    // let bc = c - b;
-    //
-    // let v_ab = v.dot(ab.normalize()) * ab.normalize();
-    // let v_ac = v.dot(ac.normalize()) * ac.normalize();
-    // let v_bc = (p - b).dot(bc.normalize()) * bc.normalize();
-    //
-    // let ab_prop = v_ab.length() / ab.length();
-    // let ac_prop = v_ac.length() / ac.length();
-    // let bc_prop = v_bc.length() / bc.length();
-    //
-    // dbg!(ab_prop, ac_prop, bc_prop);
-    //
-    // dbg!(ab.signum(), v_ab.signum());
-    // dbg!(ac.signum(), v_ac.signum());
-    // dbg!(bc.signum(), v_bc.signum());
-    //
-    // ab_prop <= 1.0 && ac_prop <= 1.0 && bc_prop <= 1.0
-    //     && ab.signum() == v_ab.signum() // Same direction
-    //     && ac.signum() == v_ac.signum()
-    //     && bc.signum() == v_bc.signum()
-
     let triangle_area = (b - a).cross(c - a).length() / 2.0;
     let alpha = (b - p).cross(c - p).length() / (2.0 * triangle_area);
     let beta = (c - p).cross(a - p).length() / (2.0 * triangle_area);
     let gamma = (b - p).cross(a - p).length() / (2.0 * triangle_area);
-    // let gamma = 1.0 - alpha - beta;
-
-    // dbg!(alpha, beta, gamma);
 
     (0.0..=1.0).contains(&alpha)
         && (0.0..=1.0).contains(&beta)
@@ -162,16 +106,12 @@ impl Fill {
         let left_side = outline[(smallest.0 + outline.len() - 1) % outline.len()] - *smallest.1;
         let right_side = outline[(smallest.0 + outline.len() + 1) % outline.len()] - *smallest.1;
         let direction = left_side.cross(right_side).length().signum();
-        dbg!(direction);
 
         let mut indexes = Vec::new();
         let mut remaining_indexes = (0..outline.len()).collect::<Vec<_>>();
 
-        outline.iter().for_each(|p| println!("({}, {})", p.x, p.z));
-
         let mut i = 0;
         'point_loop: while remaining_indexes.len() > 3 {
-            // dbg!(&remaining_indexes);
             let left_i = remaining_indexes[i % remaining_indexes.len()];
             let center_i = remaining_indexes[(i + 1) % remaining_indexes.len()];
             let right_i = remaining_indexes[(i + 2) % remaining_indexes.len()];
@@ -187,10 +127,8 @@ impl Fill {
             // Assumes that polygon is on y=0 plane
             let cross = left_side.cross(right_side);
 
-            dbg!(left_i, center_i, right_i);
             if cross.length().signum() == direction {
                 // Internal angle
-
                 for &index in remaining_indexes.iter() {
                     let p = outline[index];
                     if p == left || p == center || p == right {
@@ -199,32 +137,21 @@ impl Fill {
 
                     if point_in_triangle(p, left, center, right) {
                         i += 1;
-                        println!("Fail, point {index} in triangle");
                         continue 'point_loop;
                     }
                 }
 
                 // If reached here, everything is valid
                 indexes.extend_from_slice({
-                    // let l = remaining_indexes[left_i];
-                    // let r = remaining_indexes[right_i];
                     let c = remaining_indexes.remove((i + 1) % remaining_indexes.len());
 
-                    &[left_i, dbg!(c), right_i]
+                    &[left_i, c, right_i]
                 });
 
-                // i = 0;
                 continue;
-            } else {
-                println!("Fail, convex angle, {}", cross.signum());
             }
 
-            // i = (i + 1) % remaining_indexes.len();
             i += 1;
-
-            // if i > 100 {
-            //     break;
-            // }
         }
 
         indexes.extend(remaining_indexes.into_iter());

@@ -9,6 +9,6 @@ impl Object for Park {
     fn get_paths(&self, points: &[Point]) -> Vec<Path> {
         vec![Path::new(points.iter().map(|p| p.into()).collect())
             .with_fill(Vec3::new(205.0, 247.0, 201.0) / 255.0)
-            .with_stroke(Stroke::new(1.0, Vec3::new(122.0, 175.0, 117.0) / 255.0))]
+            .with_stroke(Stroke::new(0.1, Vec3::new(122.0, 175.0, 117.0) / 255.0))]
     }
 }
