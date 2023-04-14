@@ -8,5 +8,5 @@ edition = "2021"
 [dependencies]
 clap = { version = "4.1.8", features = ["derive"] }
 osmpbf = "0.3.0"
-opengl_renderer = { path = "../opengl_renderer/" }
+renderer = { path = "../renderer/" }
 glam = "0.23.0"

@@ -79,7 +79,5 @@ void main() {
 
     if (path.has_fill) {
         out_data.color = path.stroke_color;
-    } else {
-        out_data.color = vec3(1.0, 0.0, 0.0);
     }
 }

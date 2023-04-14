@@ -1,10 +1,13 @@
 use super::Object;
-use crate::renderer::{Color, Point, Renderable};
+use crate::Point;
+use glam::Vec3;
+use renderer::render_steps::canvas::Path;
 
 pub struct Building;
 
 impl Object for Building {
-    fn get_renderables(&self, points: &[Point]) -> Vec<Renderable> {
-        vec![Renderable::from_points(points).with_fill(Color::new(0xcc, 0xcc, 0xcc))]
+    fn get_paths(&self, points: &[Point]) -> Vec<Path> {
+        vec![Path::new(points.iter().map(|p| p.into()).collect())
+            .with_fill(Vec3::new(0.7, 0.7, 0.7))]
     }
 }

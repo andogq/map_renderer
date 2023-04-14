@@ -128,8 +128,7 @@ void main() {
             }
 
             gl_Position = pv * vec4(p, 1.0);
-            // color = path_data.stroke_color;
-            color = vec3(0.3, 0.5, 0.2);
+            color = path.stroke_color;
 
             EmitVertex();
         }

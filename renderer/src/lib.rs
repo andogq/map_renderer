@@ -1,8 +1,6 @@
-use self::{line::Line, polygon::Polygon};
 use crate::{
     ogl::{
-        texture_buffer::TextureBufferBuilder, DrawType, OpenGl, Program, VertexData, VertexFormat,
-        VertexType,
+        texture_buffer::TextureBufferBuilder, DrawType, OpenGl, Program, VertexFormat, VertexType,
     },
     window::{Window, WindowAction, WindowEvent},
 };
@@ -11,9 +9,17 @@ use opengl::ImageFormat;
 use std::{cell::RefCell, f32::consts::PI, rc::Rc};
 use winit::event::{ElementState, VirtualKeyCode};
 
-pub mod line;
-pub mod path;
-pub mod polygon;
+pub mod ogl;
+pub mod render_steps;
+pub mod window;
+
+pub trait RenderStep {
+    fn build_programs(&self, gl: &mut OpenGl) -> Vec<Rc<RefCell<Program>>>;
+    fn get_vertices(&self) -> Vec<Vec<u8>>;
+    fn get_texture_buffer(&self) -> Option<Vec<u8>> {
+        None
+    }
+}
 
 struct Camera {
     position: Vec3,
@@ -30,257 +36,16 @@ impl Camera {
     }
 }
 
-#[derive(Clone, Debug, Default)]
-pub struct Stroke {
-    width: f32,
-    dash: Option<f32>,
-    color: Vec3,
-}
-impl Stroke {
-    pub fn new(width: f32, color: Vec3) -> Self {
-        Self {
-            width,
-            color,
-            dash: None,
-        }
-    }
-
-    pub fn with_dash(mut self, dash: f32) -> Self {
-        self.dash = Some(dash);
-
-        self
-    }
-}
-
-pub fn point_in_triangle(p: Vec3, a: Vec3, b: Vec3, c: Vec3) -> bool {
-    // https://www.youtube.com/watch?v=HYAgJN3x4GA
-    let w1 = ((a.x * (c.z - a.z)) + ((p.z - a.z) * (c.x - a.x)) - (p.x * (c.z - a.z)))
-        / (((b.z - a.z) * (b.x - a.x)) - ((b.x - a.x) * (c.z - a.z)));
-    let w2 = (p.z - a.z - (w1 * (b.z - a.z))) / (c.z - a.z);
-
-    w1 >= 0.0 && w2 >= 0.0 && (w1 + w2) <= 1.0
-}
-
-#[derive(Clone, Debug, Default)]
-pub struct Fill {
-    indexes: Vec<usize>,
-    fill: Vec3,
-}
-impl Fill {
-    pub fn new(fill: Vec3, outline: &[Vec3]) -> Self {
-        let mut indexes = Vec::new();
-        let mut remaining_indexes = (0..outline.len()).collect::<Vec<_>>();
-
-        let mut i = 0;
-        'point_loop: while remaining_indexes.len() > 3 {
-            let left_i = i % remaining_indexes.len();
-            let center_i = (i + 1) % remaining_indexes.len();
-            let right_i = (i + 2) % remaining_indexes.len();
-
-            let left = outline[left_i];
-            let center = outline[center_i];
-            let right = outline[right_i];
-
-            // Check angle between center point
-            let left_side = left - center;
-            let right_side = right - center;
-
-            // Assumes that polygon is on y=0 plane
-            let cross = left_side.cross(right_side);
-
-            if cross.y < 0.0 {
-                // Internal angle
-                for &index in remaining_indexes.iter() {
-                    let p = outline[index];
-                    if p == left || p == center || p == right {
-                        continue;
-                    }
-
-                    if point_in_triangle(p, center, left, right) {
-                        i += 1;
-                        continue 'point_loop;
-                    }
-                }
-
-                // If reached here, everything is valid
-                indexes.extend_from_slice({
-                    let l = remaining_indexes[left_i];
-                    let r = remaining_indexes[right_i];
-                    &[l, remaining_indexes.remove(center_i), r]
-                });
-            }
-
-            i += 1;
-        }
-
-        indexes.extend(remaining_indexes.into_iter());
-
-        Fill { indexes, fill }
-    }
-}
-
-pub trait CanvasObject {
-    fn get_vertices(&self) -> Vec<Vec3>;
-
-    fn get_stroke(&self) -> Option<Stroke>;
-    fn get_fill(&self) -> Option<Fill>;
-}
-
-pub struct CanvasProgram<'a> {
-    objects: Vec<Box<dyn CanvasObject + 'a>>,
-}
-
-impl<'a> CanvasProgram<'a> {
-    pub fn new() -> Self {
-        Self {
-            objects: Vec::new(),
-        }
-    }
-
-    pub fn add_object<O>(&mut self, object: O)
-    where
-        O: CanvasObject + 'a,
-    {
-        self.objects.push(Box::new(object));
-    }
-}
-
-impl RenderStep for CanvasProgram<'_> {
-    fn get_vertices(&self) -> Vec<Vec<u8>> {
-        let (fill, outline): (Vec<Vec<u8>>, Vec<Vec<u8>>) = self
-            .objects
-            .iter()
-            .enumerate()
-            .map(|(id, object)| {
-                let id = id as u32;
-
-                let outline_vertices = {
-                    let mut v = object.get_vertices();
-
-                    // Join stroke back to start
-                    v.push(*v.first().unwrap());
-                    v
-                };
-
-                let fill_vertices = object
-                    .get_fill()
-                    .as_ref()
-                    .map(|fill| {
-                        fill.indexes
-                            .iter()
-                            .map(|&i| outline_vertices[i])
-                            .collect::<Vec<_>>()
-                    })
-                    .unwrap_or_default();
-
-                // Get the vertices for the object and give them an ID
-                (
-                    fill_vertices
-                        .into_iter()
-                        .flat_map(move |vertex| {
-                            [&id.to_ne_bytes(), vertex.get_bytes().as_slice()].concat()
-                        })
-                        .collect::<Vec<_>>(),
-                    outline_vertices
-                        .into_iter()
-                        .flat_map(move |vertex| {
-                            [&id.to_ne_bytes(), vertex.get_bytes().as_slice()].concat()
-                        })
-                        .collect::<Vec<_>>(),
-                )
-            })
-            .unzip();
-
-        vec![fill.concat(), outline.concat()]
-    }
-
-    fn build_programs(&self, gl: &mut OpenGl) -> Vec<Rc<RefCell<Program>>> {
-        let vertex_format = &[
-            // ID
-            VertexFormat::new(1, VertexType::UInt),
-            // Vertex
-            VertexFormat::new(3, VertexType::Float),
-        ];
-
-        [
-            ("canvas_fill", DrawType::Triangles),
-            // ("canvas_outline", DrawType::LineStrip),
-        ]
-        .into_iter()
-        .map(|(directory, draw_type)| {
-            gl.add_program(
-                Program::from_directory(directory)
-                    .unwrap()
-                    .with_format(vertex_format)
-                    .with_draw_type(draw_type),
-            )
-            .unwrap()
-        })
-        .collect()
-    }
-
-    fn get_texture_buffer(&self) -> Option<Vec<u8>> {
-        Some(
-            self.objects
-                .iter()
-                .flat_map(|object| {
-                    let stroke = object.get_stroke();
-                    let fill = object.get_fill();
-
-                    [
-                        {
-                            [stroke.is_some(), fill.is_some()]
-                                .into_iter()
-                                .enumerate()
-                                .fold(0u32, |packed, (i, value)| (packed << 1) | (value as u32))
-                                .to_ne_bytes()
-                                .as_slice()
-                        },
-                        {
-                            let stroke = stroke.unwrap_or_default();
-
-                            [
-                                stroke.color.get_bytes().as_slice(),
-                                stroke.width.to_ne_bytes().as_slice(),
-                                stroke.dash.unwrap_or_default().to_ne_bytes().as_slice(),
-                            ]
-                            .concat()
-                            .as_slice()
-                        },
-                        {
-                            let fill = fill.unwrap_or_default();
-
-                            fill.fill.get_bytes().as_slice()
-                        },
-                    ]
-                    .concat()
-                })
-                .collect(),
-        )
-    }
-}
-
-pub trait RenderStep {
-    fn build_programs(&self, gl: &mut OpenGl) -> Vec<Rc<RefCell<Program>>>;
-    fn get_vertices(&self) -> Vec<Vec<u8>>;
-    fn get_texture_buffer(&self) -> Option<Vec<u8>> {
-        None
-    }
-}
-
-pub struct World<'a> {
+pub struct Renderer<'a> {
     window: Window,
     projection: Mat4,
     camera: Camera,
 
     render_steps: Vec<Box<dyn RenderStep + 'a>>,
-
-    lines: Vec<Line>,
-    polygons: Vec<Polygon>,
 }
 
-impl<'a> World<'a> {
-    pub fn with_window(window: Window) -> Self {
+impl<'a> Renderer<'a> {
+    pub fn with_window(window: window::Window) -> Self {
         let aspect_ratio = {
             let size = window.get_size();
             size.1 as f32 / size.0 as f32
@@ -291,8 +56,6 @@ impl<'a> World<'a> {
             projection: Mat4::perspective_rh(PI / 2.0, aspect_ratio, 1.0, 50.0),
             camera: Camera::new(),
             render_steps: Vec::new(),
-            lines: Vec::new(),
-            polygons: Vec::new(),
         }
     }
 
@@ -301,14 +64,6 @@ impl<'a> World<'a> {
         R: RenderStep + 'a,
     {
         self.render_steps.push(Box::new(render_step));
-    }
-
-    pub fn add_line(&mut self, line: Line) {
-        self.lines.push(line);
-    }
-
-    pub fn add_polygon(&mut self, polygon: Polygon) {
-        self.polygons.push(polygon);
     }
 
     pub fn run(mut self) -> ! {
@@ -387,10 +142,6 @@ impl<'a> World<'a> {
                 .unwrap();
             line_program
                 .set_uniform("view", &self.camera.view())
-                .unwrap();
-
-            line_program
-                .attach_vertices(self.lines.as_slice(), None)
                 .unwrap();
         }
 

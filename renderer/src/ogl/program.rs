@@ -1,5 +1,5 @@
 use super::{texture_buffer::TextureBuffer, OpenGlError};
-use glam::Mat4;
+use glam::{Mat4, Vec3};
 use opengl::{Buffer, BufferType, Capability, Context, Location, ShaderType, VertexArrayObject};
 use std::{
     cell::RefCell, collections::HashMap, error::Error, fmt::Display, fs, path::Path, rc::Rc,
@@ -225,6 +225,15 @@ pub trait VertexData {
     fn get_bytes(&self) -> Vec<u8>;
 }
 
+impl VertexData for Vec3 {
+    fn get_bytes(&self) -> Vec<u8> {
+        self.to_array()
+            .iter()
+            .flat_map(|n| n.to_ne_bytes())
+            .collect()
+    }
+}
+
 impl<V> VertexData for &[V]
 where
     V: VertexData,
@@ -262,7 +271,7 @@ impl Program {
         let mut builder = ProgramBuilder::new();
 
         // Read the directory
-        let directory = Path::new("opengl_renderer/src/shaders").join(directory_name);
+        let directory = Path::new("renderer/src/shaders").join(directory_name);
         for entry in fs::read_dir(directory).map_err(ProgramBuilderError::IoError)? {
             let entry = entry.map_err(ProgramBuilderError::IoError)?;
 

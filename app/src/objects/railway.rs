@@ -1,16 +1,13 @@
 use super::Object;
-use crate::renderer::{Color, DashStyle, Point, Renderable, Stroke, StrokeStyle};
+use crate::Point;
+use glam::Vec3;
+use renderer::render_steps::canvas::{Path, Stroke};
 
 pub struct Railway;
 
 impl Object for Railway {
-    fn get_renderables(&self, points: &[Point]) -> Vec<Renderable> {
-        let color = Color::new(164, 214, 255);
-
-        vec![Renderable::from_points(points).with_stroke(Stroke {
-            width: 1.0,
-            color,
-            style: StrokeStyle::Solid,
-        })]
+    fn get_paths(&self, points: &[Point]) -> Vec<Path> {
+        vec![Path::new(points.iter().map(|p| p.into()).collect())
+            .with_stroke(Stroke::new(1.0, Vec3::new(164.0, 214.0, 255.0) / 255.0))]
     }
 }

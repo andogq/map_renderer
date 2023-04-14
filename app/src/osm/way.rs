@@ -1,6 +1,5 @@
-use crate::objects::*;
-
 use super::Tags;
+use crate::objects::*;
 
 pub struct Way {
     pub tags: Tags,
@@ -8,7 +7,7 @@ pub struct Way {
 }
 
 impl Way {
-    pub fn to_object(&self) -> Option<Box<dyn Object>> {
+    pub(crate) fn to_object(&self) -> Option<Box<dyn Object>> {
         if self.tags.contains("highway") {
             return Some(Box::new(Highway::from_tags(&self.tags).unwrap()));
         } else if self

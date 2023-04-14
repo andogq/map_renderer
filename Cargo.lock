@@ -807,18 +807,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "opengl_renderer"
-version = "0.1.0"
-dependencies = [
- "glam",
- "glutin",
- "glutin-winit",
- "opengl",
- "raw-window-handle",
- "winit",
-]
-
-[[package]]
 name = "orbclient"
 version = "0.3.43"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -865,8 +853,8 @@ version = "0.1.0"
 dependencies = [
  "clap",
  "glam",
- "opengl_renderer",
  "osmpbf",
+ "renderer",
 ]
 
 [[package]]
@@ -1058,6 +1046,18 @@ name = "regex-syntax"
 version = "0.6.28"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "456c603be3e8d448b072f410900c09faf164fbce2d480456f50eea6e25f9c848"
+
+[[package]]
+name = "renderer"
+version = "0.1.0"
+dependencies = [
+ "glam",
+ "glutin",
+ "glutin-winit",
+ "opengl",
+ "raw-window-handle",
+ "winit",
+]
 
 [[package]]
 name = "rustix"

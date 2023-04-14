@@ -3,13 +3,14 @@ mod highway;
 mod park;
 mod railway;
 
-use crate::renderer::{Point, Renderable};
+use crate::Point;
 
 pub use building::Building;
 pub use highway::Highway;
 pub use park::Park;
 pub use railway::Railway;
+use renderer::render_steps::canvas::Path;
 
-pub trait Object {
-    fn get_renderables(&self, points: &[Point]) -> Vec<Renderable>;
+pub(crate) trait Object {
+    fn get_paths(&self, points: &[Point]) -> Vec<Path>;
 }

@@ -1,8 +1,8 @@
+use glam::Vec3;
+use renderer::render_steps::canvas::{Path, Stroke};
+
 use super::Object;
-use crate::{
-    osm::Tags,
-    renderer::{Color, DashStyle, Point, Renderable, Stroke, StrokeStyle},
-};
+use crate::{osm::Tags, Point};
 
 // https://wiki.openstreetmap.org/wiki/Key:highway?uselang=en-GB
 #[allow(dead_code)]
@@ -36,40 +36,43 @@ impl Highway {
 }
 
 impl Object for Highway {
-    fn get_renderables(&self, points: &[Point]) -> Vec<Renderable> {
-        vec![Renderable::from_points(points).with_stroke({
-            let width = match self {
-                Self::Motorway => 4.0,
-                Self::Trunk | Self::Primary | Self::Secondary | Self::Tertiary => 2.0,
-                Self::Service => 0.75,
-                Self::Footway | Self::Path => 0.5,
-                _ => 1.0,
-            };
-            let color = match self {
-                Self::Motorway => Color::new(223, 46, 107),
-                Self::Trunk => Color::new(234, 144, 161),
-                Self::Primary => Color::new(252, 192, 171),
-                Self::Secondary => Color::new(253, 214, 1),
-                Self::Tertiary => Color::new(246, 250, 187),
-                Self::Footway | Self::Path => Color::new(250, 164, 156),
-                _ => Color::new(169, 175, 182),
-            };
-            let style = match self {
-                Self::Footway | Self::Path => StrokeStyle::Dashed(DashStyle::Dot),
-                Self::Motorway | Self::Trunk | Self::Primary | Self::Secondary | Self::Tertiary => {
-                    StrokeStyle::Doubled {
-                        outer_width: 0.5,
-                        outer_color: Color::new(0, 0, 0),
-                    }
-                }
-                _ => StrokeStyle::Solid,
-            };
+    fn get_paths(&self, points: &[Point]) -> Vec<Path> {
+        vec![
+            Path::new(points.iter().map(|p| p.into()).collect()).with_stroke({
+                let width = match self {
+                    Self::Motorway => 4.0,
+                    Self::Trunk | Self::Primary | Self::Secondary | Self::Tertiary => 2.0,
+                    Self::Service => 0.75,
+                    Self::Footway | Self::Path => 0.5,
+                    _ => 1.0,
+                };
+                let color = match self {
+                    Self::Motorway => Vec3::new(223.0, 46.0, 107.0) / 255.0,
+                    Self::Trunk => Vec3::new(234.0, 144.0, 161.0) / 255.0,
+                    Self::Primary => Vec3::new(252.0, 192.0, 171.0) / 255.0,
+                    Self::Secondary => Vec3::new(253.0, 214.0, 1.0) / 255.0,
+                    Self::Tertiary => Vec3::new(246.0, 250.0, 187.0) / 255.0,
+                    Self::Footway | Self::Path => Vec3::new(250.0, 164.0, 156.0) / 255.0,
+                    _ => Vec3::new(169.0, 175.0, 182.0) / 255.0,
+                };
+                let dash = match self {
+                    Self::Footway | Self::Path => Some(0.2),
+                    Self::Motorway
+                    | Self::Trunk
+                    | Self::Primary
+                    | Self::Secondary
+                    | Self::Tertiary => Some(0.5),
+                    _ => None,
+                };
 
-            Stroke {
-                width,
-                color,
-                style,
-            }
-        })]
+                let mut stroke = Stroke::new(width, color);
+
+                if let Some(dash) = dash {
+                    stroke = stroke.with_dash(dash);
+                }
+
+                stroke
+            }),
+        ]
     }
 }
