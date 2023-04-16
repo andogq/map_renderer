@@ -184,6 +184,11 @@ fn main() -> osmpbf::Result<()> {
         }
     }
 
+    // canvas.add_object(
+    //     Path::new(vec![Vec3::new(0.0, 0.0, 0.0), Vec3::new(10.0, 0.0, 0.0)])
+    //         .with_stroke(Stroke::new(1.0, Vec3::new(0.3, 0.6, 0.8)).with_dash(2.0)),
+    // );
+
     world.add_render_step(canvas);
     world.run();
 }

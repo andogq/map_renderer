@@ -228,7 +228,7 @@ impl<'a> Renderer<'a> {
                             / (plane_normal.dot(normalised_ray))
                             * normalised_ray);
 
-                    // dbg!(plane_intersection);
+                    dbg!(plane_intersection);
 
                     if dragging {
                         if let Some(last) = last_location {

@@ -190,13 +190,8 @@ impl RenderStep for CanvasProgram<'_> {
             .map(|(id, object)| {
                 let id = id as u32;
 
-                let outline_vertices = {
-                    let mut v = object.get_vertices();
-
-                    // Join stroke back to start
-                    v.push(*v.first().unwrap());
-                    v
-                };
+                let outline_vertices = 
+                    object.get_vertices();
 
                 let fill_vertices = object
                     .get_fill()
@@ -217,7 +212,7 @@ impl RenderStep for CanvasProgram<'_> {
                             [&id.to_ne_bytes(), vertex.get_bytes().as_slice()].concat()
                         })
                         .collect::<Vec<_>>(),
-                    outline_vertices
+                    dbg!(outline_vertices)
                         .into_iter()
                         .flat_map(move |vertex| {
                             [&id.to_ne_bytes(), vertex.get_bytes().as_slice()].concat()
