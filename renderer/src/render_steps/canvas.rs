@@ -241,7 +241,7 @@ impl RenderStep for CanvasProgram<'_> {
         .into_iter()
         .map(|(directory, draw_type)| {
             gl.add_program(
-                Program::from_directory(directory)
+                Program::from_directory(&format!("renderer/src/shaders/{}", directory))
                     .unwrap()
                     .with_format(vertex_format)
                     .with_draw_type(draw_type),

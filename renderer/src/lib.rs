@@ -1,7 +1,5 @@
 use crate::{
-    ogl::{
-        texture_buffer::TextureBufferBuilder, DrawType, OpenGl, Program, VertexFormat, VertexType,
-    },
+    ogl::{texture_buffer::TextureBufferBuilder, OpenGl, Program},
     window::{Window, WindowAction, WindowEvent},
 };
 use glam::{Mat4, Vec3, Vec4};
@@ -114,40 +112,10 @@ impl<'a> Renderer<'a> {
         // Provide initial uniforms
         update_uniforms(programs.as_slice(), &self.projection, &self.camera.view());
 
-        let line_program = self
-            .window
-            .gl
-            .add_program(
-                Program::from_directory("line")
-                    .unwrap()
-                    .with_format(&[
-                        VertexFormat::new(1, VertexType::UInt),
-                        VertexFormat::new(3, VertexType::Float),
-                        VertexFormat::new(1, VertexType::Float),
-                        VertexFormat::new(3, VertexType::Float),
-                        VertexFormat::new(1, VertexType::Float),
-                    ])
-                    .with_draw_type(DrawType::LineStrip),
-            )
-            .unwrap();
-
         let mut last_location = None;
         let mut dragging = false;
 
-        {
-            let mut line_program = line_program.borrow_mut();
-
-            line_program
-                .set_uniform("projection", &self.projection)
-                .unwrap();
-            line_program
-                .set_uniform("view", &self.camera.view())
-                .unwrap();
-        }
-
         self.window.run(move |event, window_info| {
-            let mut line_program = line_program.borrow_mut();
-
             match event {
                 WindowEvent::Keyboard {
                     keycode,
@@ -171,10 +139,6 @@ impl<'a> Renderer<'a> {
                         }
                         _ => (),
                     }
-
-                    line_program
-                        .set_uniform("view", &self.camera.view())
-                        .unwrap();
 
                     update_uniforms(programs.as_slice(), &self.projection, &self.camera.view());
 
@@ -244,10 +208,6 @@ impl<'a> Renderer<'a> {
                                 plane_intersection - (self.camera.position - target_transition),
                             );
 
-                            line_program
-                                .set_uniform("view", &self.camera.view())
-                                .unwrap();
-
                             update_uniforms(
                                 programs.as_slice(),
                                 &self.projection,
@@ -264,10 +224,6 @@ impl<'a> Renderer<'a> {
                 }
                 WindowEvent::Scroll { x: _, y } => {
                     self.camera.position.y += y / 10.0;
-
-                    line_program
-                        .set_uniform("view", &self.camera.view())
-                        .unwrap();
 
                     update_uniforms(programs.as_slice(), &self.projection, &self.camera.view());
 

@@ -271,7 +271,7 @@ impl Program {
         let mut builder = ProgramBuilder::new();
 
         // Read the directory
-        let directory = Path::new("renderer/src/shaders").join(directory_name);
+        let directory = Path::new(directory_name);
         for entry in fs::read_dir(directory).map_err(ProgramBuilderError::IoError)? {
             let entry = entry.map_err(ProgramBuilderError::IoError)?;
 
