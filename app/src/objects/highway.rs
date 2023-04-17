@@ -67,9 +67,9 @@ impl Object for Highway {
 
                 let mut stroke = Stroke::new(width, color);
 
-                if let Some(dash) = dash {
-                    stroke = stroke.with_dash(dash);
-                }
+                // if let Some(dash) = dash {
+                //     stroke = stroke.with_dash(dash);
+                // }
 
                 stroke
             }),
