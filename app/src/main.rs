@@ -1,10 +1,12 @@
 mod objects;
 mod osm;
+mod path_finder;
 
 use clap::Parser;
 use glam::Vec3;
 use osm::{Node, Osm};
 use osmpbf::ElementReader;
+use path_finder::PathFinder;
 use renderer::{
     render_steps::canvas::{point_in_triangle, CanvasProgram, Path, Stroke},
     window::Window,
@@ -164,7 +166,7 @@ fn main() -> osmpbf::Result<()> {
     let mut canvas = CanvasProgram::default();
 
     // Add all of the lines
-    for (id, way) in osm_data.ways {
+    for (id, way) in &osm_data.ways {
         if let Some(way_type) = way.to_object() {
             let points = way
                 .nodes
@@ -190,5 +192,6 @@ fn main() -> osmpbf::Result<()> {
     // );
 
     world.add_render_step(canvas);
+    world.add_render_step(PathFinder::new(&osm_data, &bounding));
     world.run();
 }
