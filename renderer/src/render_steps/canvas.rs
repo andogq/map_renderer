@@ -170,20 +170,21 @@ pub trait CanvasObject {
 }
 
 #[derive(Default)]
-pub struct CanvasProgram<'a> {
-    objects: Vec<Box<dyn CanvasObject + 'a>>,
+pub struct CanvasProgram {
+    objects: Vec<Box<dyn CanvasObject>>,
 }
 
-impl<'a> CanvasProgram<'a> {
-    pub fn add_object<O>(&mut self, object: O)
-    where
-        O: CanvasObject + 'a,
-    {
-        self.objects.push(Box::new(object));
+impl CanvasProgram {
+    pub fn add_object(&mut self, object: Box<dyn CanvasObject>) {
+        self.objects.push(object);
+    }
+
+    pub fn clear(&mut self) {
+        self.objects.clear();
     }
 }
 
-impl RenderStep for CanvasProgram<'_> {
+impl RenderStep for CanvasProgram {
     fn get_vertices(&self) -> Vec<Vec<u8>> {
         let (fill, outline): (Vec<Vec<u8>>, Vec<Vec<u8>>) = self
             .objects

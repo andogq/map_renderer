@@ -34,15 +34,15 @@ impl Camera {
     }
 }
 
-pub struct Renderer<'a> {
+pub struct Renderer {
     window: Window,
     projection: Mat4,
     camera: Camera,
 
-    render_steps: Vec<Box<dyn RenderStep + 'a>>,
+    render_steps: Vec<Rc<RefCell<dyn RenderStep>>>,
 }
 
-impl<'a> Renderer<'a> {
+impl Renderer {
     pub fn with_window(window: window::Window) -> Self {
         let aspect_ratio = {
             let size = window.get_size();
@@ -57,11 +57,8 @@ impl<'a> Renderer<'a> {
         }
     }
 
-    pub fn add_render_step<R>(&mut self, render_step: R)
-    where
-        R: RenderStep + 'a,
-    {
-        self.render_steps.push(Box::new(render_step));
+    pub fn add_render_step(&mut self, render_step: Rc<RefCell<dyn RenderStep>>) {
+        self.render_steps.push(render_step);
     }
 
     pub fn run(mut self) -> ! {
@@ -69,6 +66,8 @@ impl<'a> Renderer<'a> {
             .render_steps
             .iter()
             .flat_map(|render_step| {
+                let render_step = render_step.borrow();
+
                 let programs = render_step.build_programs(&mut self.window.gl);
                 let vertices = render_step.get_vertices();
 
