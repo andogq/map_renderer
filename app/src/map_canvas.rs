@@ -1,8 +1,12 @@
 use std::{cell::RefCell, rc::Rc};
 
-use renderer::{render_steps::canvas::CanvasProgram, RenderStep};
+use glam::Vec3;
+use renderer::{
+    render_steps::canvas::{CanvasProgram, Path},
+    Event, RenderStep,
+};
 
-use crate::{map_data::MapData, plugin::Plugin, AppState, Point};
+use crate::{map_data::MapData, plugin::Plugin, Point};
 
 pub(crate) struct MapCanvas {
     canvas: Rc<RefCell<CanvasProgram>>,
@@ -18,7 +22,7 @@ impl MapCanvas {
     }
 }
 
-impl Plugin<AppState> for MapCanvas {
+impl Plugin<()> for MapCanvas {
     fn with_map_data(&mut self, map_data: Rc<MapData>) {
         let mut canvas = self.canvas.borrow_mut();
 
@@ -48,7 +52,26 @@ impl Plugin<AppState> for MapCanvas {
         Rc::clone(&self.canvas) as Rc<RefCell<dyn RenderStep>>
     }
 
-    fn handle_event(&mut self, app_state: AppState, event: renderer::window::WindowEvent) -> bool {
-        todo!()
+    fn handle_event(&mut self, app_state: (), event: Event) -> bool {
+        let mut canvas = self.canvas.borrow_mut();
+
+        if let Event::Click(point) = event {
+            canvas.add_object(Box::new(
+                Path::new(
+                    [
+                        Vec3::new(0.0, 0.0, 0.0),
+                        Vec3::new(1.0, 0.0, 0.0),
+                        Vec3::new(0.0, 0.0, 1.0),
+                        Vec3::new(0.0, 0.0, 0.0),
+                    ]
+                    .into_iter()
+                    .map(|p| point + p)
+                    .collect(),
+                )
+                .with_fill(Vec3::new(1.0, 0.0, 0.0)),
+            ));
+        }
+
+        false
     }
 }

@@ -1,6 +1,6 @@
 use std::{cell::RefCell, rc::Rc};
 
-use renderer::{window::WindowEvent, RenderStep};
+use renderer::{ RenderStep, Event};
 
 use crate::map_data::MapData;
 
@@ -13,5 +13,5 @@ pub(crate) trait Plugin<A> {
 
     /// Called every time an event on the window occurs, returning true or false depending on
     /// whether the plugin state changed (and a re-render is requried).
-    fn handle_event(&mut self, app_state: A, event: WindowEvent) -> bool;
+    fn handle_event(&mut self, app_state: A, event: Event) -> bool;
 }

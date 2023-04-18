@@ -42,6 +42,12 @@ pub struct Renderer {
     render_steps: Vec<Rc<RefCell<dyn RenderStep>>>,
 }
 
+#[derive(Debug, Clone, Copy)]
+pub enum Event {
+    Keyboard(VirtualKeyCode),
+    Click(Vec3),
+}
+
 impl Renderer {
     pub fn with_window(window: window::Window) -> Self {
         let aspect_ratio = {
@@ -61,11 +67,15 @@ impl Renderer {
         self.render_steps.push(render_step);
     }
 
-    pub fn run(mut self) -> ! {
+    pub fn run<F>(mut self, mut event_callback: F) -> !
+    where
+        F: 'static + FnMut(Event),
+    {
         let programs = self
             .render_steps
             .iter()
-            .flat_map(|render_step| {
+            .enumerate()
+            .flat_map(|(render_step_id, render_step)| {
                 let render_step = render_step.borrow();
 
                 let programs = render_step.build_programs(&mut self.window.gl);
@@ -96,22 +106,28 @@ impl Renderer {
                 }
 
                 programs
+                    .into_iter()
+                    .enumerate()
+                    .map(move |(program_offset, p)| (render_step_id, program_offset, p))
             })
             .collect::<Vec<_>>();
 
         let update_uniforms =
-            |programs: &[Rc<RefCell<Program>>], projection: &Mat4, view: &Mat4| {
-                programs.iter().for_each(|program| {
-                    let mut program = program.borrow_mut();
-                    program.set_uniform("projection", projection).unwrap();
-                    program.set_uniform("view", view).unwrap();
-                });
+            |programs: &[(usize, usize, Rc<RefCell<Program>>)], projection: &Mat4, view: &Mat4| {
+                programs
+                    .iter()
+                    .for_each(|(_render_step_id, _program_offset, program)| {
+                        let mut program = program.borrow_mut();
+                        program.set_uniform("projection", projection).unwrap();
+                        program.set_uniform("view", view).unwrap();
+                    });
             };
 
         // Provide initial uniforms
         update_uniforms(programs.as_slice(), &self.projection, &self.camera.view());
 
         let mut last_location = None;
+        let mut mouse_location = Vec3::new(0.0, 0.0, 0.0);
         let mut dragging = false;
 
         self.window.run(move |event, window_info| {
@@ -120,6 +136,7 @@ impl Renderer {
                     keycode,
                     state: ElementState::Pressed,
                 } => {
+                    // Update camera
                     match keycode {
                         VirtualKeyCode::Escape => {
                             return Some(WindowAction::Close);
@@ -141,11 +158,29 @@ impl Renderer {
 
                     update_uniforms(programs.as_slice(), &self.projection, &self.camera.view());
 
+                    // Event callback
+                    event_callback(Event::Keyboard(keycode));
+
                     // Trigger redraw
                     return Some(WindowAction::RequestRedraw);
                 }
                 WindowEvent::MouseDown => {
                     dragging = true;
+
+                    event_callback(Event::Click(mouse_location));
+
+                    // TODO: Remove
+                    programs
+                        .iter()
+                        .for_each(|(render_step_id, program_offset, program)| {
+                            let render_step = self.render_steps[*render_step_id].borrow();
+                            let vertices = render_step.get_vertices();
+
+                            program
+                                .borrow_mut()
+                                .attach_vertices(vertices[*program_offset].clone(), None)
+                                .unwrap();
+                        });
                 }
                 WindowEvent::MouseUp => {
                     last_location = None;
@@ -191,7 +226,7 @@ impl Renderer {
                             / (plane_normal.dot(normalised_ray))
                             * normalised_ray);
 
-                    dbg!(plane_intersection);
+                    mouse_location = plane_intersection;
 
                     if dragging {
                         if let Some(last) = last_location {

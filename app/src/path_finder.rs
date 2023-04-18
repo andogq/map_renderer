@@ -1,6 +1,6 @@
 use std::collections::{HashMap, HashSet};
 
-use crate::{osm::Osm, map_data::Bounding};
+use crate::{map_data::Bounding, osm::Osm};
 use glam::Vec3;
 use renderer::{
     ogl::{DrawType, Program, VertexData, VertexFormat, VertexType},

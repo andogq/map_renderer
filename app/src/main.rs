@@ -58,16 +58,11 @@ impl From<&Point> for Vec3 {
     }
 }
 
-struct AppState {
-    pub height: u32,
-    pub width: u32,
-}
-
 fn main() -> osmpbf::Result<()> {
     let args = Args::parse();
 
     // Load plugins
-    let mut plugins: [Box<dyn Plugin<AppState>>; 1] = [Box::new(MapCanvas::new())];
+    let mut plugins: [Box<dyn Plugin<()>>; 1] = [Box::new(MapCanvas::new())];
 
     // Load map data from disk
     let reader = ElementReader::from_path(&args.pbf_file).expect("input file should exist");
@@ -83,5 +78,9 @@ fn main() -> osmpbf::Result<()> {
         renderer.add_render_step(plugin.get_render_step());
     }
 
-    renderer.run()
+    renderer.run(move |event| {
+        for plugin in plugins.iter_mut() {
+            plugin.handle_event((), event);
+        }
+    });
 }
