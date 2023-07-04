@@ -2,7 +2,7 @@ use crate::{
     ogl::{texture_buffer::TextureBufferBuilder, OpenGl, Program},
     window::{Window, WindowAction, WindowEvent},
 };
-use glam::{Mat4, Vec3, Vec4};
+use glam::{Mat4, Vec2, Vec3};
 use opengl::ImageFormat;
 use std::{cell::RefCell, f32::consts::PI, rc::Rc};
 use winit::event::{ElementState, VirtualKeyCode};
@@ -20,23 +20,39 @@ pub trait RenderStep {
 }
 
 struct Camera {
+    /// Current position of the camera
     position: Vec3,
+
+    /// Field of view of the camera in radians
+    fov: f32,
+
+    /// Aspect ratio of the camera
+    aspect_ratio: f32,
+
+    /// Near and far distances of the Z plane
+    z_plane: (f32, f32),
 }
 impl Camera {
-    pub fn new() -> Self {
+    pub fn new(height: f32, fov: f32, aspect_ratio: f32, z_plane: (f32, f32)) -> Self {
         Self {
-            position: Vec3::new(0.0, -20.0, 0.0),
+            position: Vec3::new(0.0, -height, 0.0),
+            fov,
+            aspect_ratio,
+            z_plane,
         }
     }
 
     pub fn view(&self) -> Mat4 {
         Mat4::look_to_rh(self.position, Vec3::Y, Vec3::Z)
     }
+
+    pub fn projection(&self) -> Mat4 {
+        Mat4::perspective_rh(self.fov, self.aspect_ratio, self.z_plane.0, self.z_plane.1)
+    }
 }
 
 pub struct Renderer {
     window: Window,
-    projection: Mat4,
     camera: Camera,
 
     render_steps: Vec<Rc<RefCell<dyn RenderStep>>>,
@@ -57,8 +73,7 @@ impl Renderer {
 
         Self {
             window,
-            projection: Mat4::perspective_rh(PI / 2.0, aspect_ratio, 0.001, 500.0),
-            camera: Camera::new(),
+            camera: Camera::new(20.0, PI / 2.0, aspect_ratio, (0.000001, 100000.0)),
             render_steps: Vec::new(),
         }
     }
@@ -124,11 +139,15 @@ impl Renderer {
             };
 
         // Provide initial uniforms
-        update_uniforms(programs.as_slice(), &self.projection, &self.camera.view());
+        update_uniforms(
+            programs.as_slice(),
+            &self.camera.projection(),
+            &self.camera.view(),
+        );
 
-        let mut last_location = None;
         let mut mouse_location = Vec3::new(0.0, 0.0, 0.0);
         let mut dragging = false;
+        let mut previous_normalised_screen_cursor = None;
 
         self.window.run(move |event, window_info| {
             match event {
@@ -156,7 +175,11 @@ impl Renderer {
                         _ => (),
                     }
 
-                    update_uniforms(programs.as_slice(), &self.projection, &self.camera.view());
+                    update_uniforms(
+                        programs.as_slice(),
+                        &self.camera.projection(),
+                        &self.camera.view(),
+                    );
 
                     // Event callback
                     event_callback(Event::Keyboard(keycode));
@@ -183,7 +206,6 @@ impl Renderer {
                         });
                 }
                 WindowEvent::MouseUp => {
-                    last_location = None;
                     dragging = false;
                 }
                 WindowEvent::MouseMove {
@@ -194,72 +216,62 @@ impl Renderer {
                     let x = physical_x / window_info.scale;
                     let y = physical_y / window_info.scale;
 
-                    // Step 1
-                    let x = ((x / size.width as f32) * 2.0) - 1.0;
-                    let y = 1.0 - ((y / size.height as f32) * 2.0);
+                    // https://gamedev.stackexchange.com/a/150425
+                    let vertical_span = f32::tan(0.5 * self.camera.fov);
 
-                    // Step 2
-                    let mouse_ndc = Vec4::new(x, y, 1.0, 1.0);
-
-                    // Step 3
-                    let inverse_mvp = self.projection.mul_mat4(&self.camera.view()).inverse();
-
-                    // Step 4
-                    let mouse_world = inverse_mvp * mouse_ndc;
-
-                    // Step 5
-                    let mouse_position = Vec3::new(
-                        mouse_world.x / mouse_world.w,
-                        mouse_world.y / mouse_world.w,
-                        mouse_world.z / mouse_world.w,
+                    let normalised_screen_cursor = Vec2::new(
+                        ((x / size.width as f32) * 2.0) - 1.0,
+                        1.0 - ((y / size.height as f32) * 2.0),
                     );
 
-                    // Ray pointing from camera to the mouse_position (could be at any depth)
-                    let normalised_ray = (mouse_position - self.camera.position).normalize();
+                    // Convert camera 2D vector to view space
+                    let view_cursor = Vec3::new(
+                        normalised_screen_cursor.x * vertical_span,
+                        1.0,
+                        normalised_screen_cursor.y * vertical_span,
+                    );
 
-                    // Extend normalised_ray from camera to intersect with plane (y = 0)
-                    let ray_point = self.camera.position;
-                    let plane_normal = Vec3::Y;
-                    let plane_point = Vec3::ZERO;
-                    let plane_intersection = ray_point
-                        + ((plane_normal.dot(plane_point - ray_point))
-                            / (plane_normal.dot(normalised_ray))
-                            * normalised_ray);
+                    // Determine camera depth (map plane at y = 0)
+                    let depth = -self.camera.position.y;
 
-                    mouse_location = plane_intersection;
+                    // Determine world cursor
+                    mouse_location = self.camera.position + (view_cursor * depth);
 
-                    if dragging {
-                        if let Some(last) = last_location {
-                            let translation = last - plane_intersection;
-                            let target_transition = self.camera.position + translation;
+                    if let Some(previous_normalised_screen_cursor) =
+                        previous_normalised_screen_cursor
+                    {
+                        let screen_travel: Vec2 =
+                            previous_normalised_screen_cursor - normalised_screen_cursor;
 
-                            let distance = self.camera.position.distance(target_transition);
-                            let t = f32::clamp(0.2 * distance, 0.01, 1.0);
+                        let world_travel = Vec3::new(
+                            screen_travel.x * depth * vertical_span,
+                            0.0,
+                            screen_travel.y * depth * vertical_span,
+                        );
 
-                            self.camera.position =
-                                glam::Vec3::lerp(self.camera.position, target_transition, t);
-                            last_location = Some(
-                                plane_intersection - (self.camera.position - target_transition),
-                            );
+                        if dragging {
+                            self.camera.position += world_travel;
 
                             update_uniforms(
                                 programs.as_slice(),
-                                &self.projection,
+                                &self.camera.projection(),
                                 &self.camera.view(),
                             );
-                        } else {
-                            last_location = Some(plane_intersection);
                         }
-                    } else {
-                        last_location = None;
                     }
+
+                    previous_normalised_screen_cursor = Some(normalised_screen_cursor);
 
                     return Some(WindowAction::RequestRedraw);
                 }
                 WindowEvent::Scroll { x: _, y } => {
                     self.camera.position.y += y / 10.0;
 
-                    update_uniforms(programs.as_slice(), &self.projection, &self.camera.view());
+                    update_uniforms(
+                        programs.as_slice(),
+                        &self.camera.projection(),
+                        &self.camera.view(),
+                    );
 
                     return Some(WindowAction::RequestRedraw);
                 }
@@ -270,3 +282,4 @@ impl Renderer {
         });
     }
 }
+
