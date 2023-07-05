@@ -239,7 +239,7 @@ impl Renderer {
                     let depth = -self.camera.position.y;
 
                     // Determine world cursor
-                    mouse_location = dbg!(self.camera.position + (view_cursor * depth));
+                    mouse_location = self.camera.position + (view_cursor * depth);
 
                     if let Some(previous_normalised_screen_cursor) =
                         previous_normalised_screen_cursor
@@ -269,15 +269,31 @@ impl Renderer {
                     return Some(WindowAction::RequestRedraw);
                 }
                 WindowEvent::Scroll { x: _, y } => {
-                    self.camera.position.y += y * 10.0;
+                    if y.abs() != 0.0 {
+                        // Scroll values are kind of arbitrary, but seem to increase with more
+                        // 'momentum' or speed on the mouse wheel/trackpad. `zoom_magnitude_max`
+                        // provides an upperbound for this value, allowing it to be reduced to a
+                        // value between 0 and 1, causing the scroll speed to increase or
+                        // decrease depending on how fast the user is scrolling.
+                        let zoom_magnitude_max = 15.0;
+                        let zoom_speed_threshold =
+                            y.abs().min(zoom_magnitude_max) / zoom_magnitude_max;
 
-                    update_uniforms(
-                        programs.as_slice(),
-                        &self.camera.projection(),
-                        &self.camera.view(),
-                    );
+                        // Scale will be how much the zoom level will change as a result of the
+                        // zoom event. It must atleast be the same (1.0), and cannot change by more
+                        // than 25% of it's current value (0.25), the percentage of which is
+                        // determined by the scroll speed, as discussed above.
+                        let scale = 1.0 + (-0.25 * zoom_speed_threshold * y.signum());
+                        self.camera.position.y = (self.camera.position.y * scale).min(-1.0);
 
-                    return Some(WindowAction::RequestRedraw);
+                        update_uniforms(
+                            programs.as_slice(),
+                            &self.camera.projection(),
+                            &self.camera.view(),
+                        );
+
+                        return Some(WindowAction::RequestRedraw);
+                    }
                 }
                 _ => (),
             }
