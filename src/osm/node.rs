@@ -21,8 +21,13 @@ impl Node {
     }
 
     pub fn from_lon_lat(lon: f64, lat: f64) -> Node {
+        // Lon degrees to radians
+        let lon = lon * PI / 180.0;
+        let lat = lat * PI / 180.0;
+
         let x = WGS84_A * (lon + (2.0 * PI));
         let y = WGS84_A * f64::ln((lat.sin() + 1.0) / lat.cos());
+
         Node {
             x,
             y,

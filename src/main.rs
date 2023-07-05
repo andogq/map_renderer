@@ -67,11 +67,14 @@ fn main() -> osmpbf::Result<()> {
     // Load map data from disk
     let reader = ElementReader::from_path(&args.pbf_file).expect("input file should exist");
     let osm_data = Osm::from_reader(reader)?;
-    let map_data = Rc::new(MapData::new(osm_data, 500.0));
+    let map_data = Rc::new(MapData::new(osm_data));
 
     // Initialise window and renderer
     let window = Window::new((args.size, args.size));
     let mut renderer = Renderer::with_window(window);
+
+    // Set initial camera position
+    renderer.set_camera_position(Vec3::new(0.0, -1000.0, 0.0));
 
     for plugin in plugins.iter_mut() {
         plugin.with_map_data(Rc::clone(&map_data));

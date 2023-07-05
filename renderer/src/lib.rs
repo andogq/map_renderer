@@ -33,9 +33,9 @@ struct Camera {
     z_plane: (f32, f32),
 }
 impl Camera {
-    pub fn new(height: f32, fov: f32, aspect_ratio: f32, z_plane: (f32, f32)) -> Self {
+    pub fn new(fov: f32, aspect_ratio: f32, z_plane: (f32, f32)) -> Self {
         Self {
-            position: Vec3::new(0.0, -height, 0.0),
+            position: Vec3::new(0.0, 0.0, 0.0),
             fov,
             aspect_ratio,
             z_plane,
@@ -73,13 +73,17 @@ impl Renderer {
 
         Self {
             window,
-            camera: Camera::new(20.0, PI / 2.0, aspect_ratio, (0.000001, 100000.0)),
+            camera: Camera::new(PI / 2.0, aspect_ratio, (0.000001, 100000.0)),
             render_steps: Vec::new(),
         }
     }
 
     pub fn add_render_step(&mut self, render_step: Rc<RefCell<dyn RenderStep>>) {
         self.render_steps.push(render_step);
+    }
+
+    pub fn set_camera_position(&mut self, position: Vec3) {
+        self.camera.position = position;
     }
 
     pub fn run<F>(mut self, mut event_callback: F) -> !
@@ -235,7 +239,7 @@ impl Renderer {
                     let depth = -self.camera.position.y;
 
                     // Determine world cursor
-                    mouse_location = self.camera.position + (view_cursor * depth);
+                    mouse_location = dbg!(self.camera.position + (view_cursor * depth));
 
                     if let Some(previous_normalised_screen_cursor) =
                         previous_normalised_screen_cursor
@@ -265,7 +269,7 @@ impl Renderer {
                     return Some(WindowAction::RequestRedraw);
                 }
                 WindowEvent::Scroll { x: _, y } => {
-                    self.camera.position.y += y / 10.0;
+                    self.camera.position.y += y * 10.0;
 
                     update_uniforms(
                         programs.as_slice(),

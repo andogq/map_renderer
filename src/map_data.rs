@@ -6,6 +6,8 @@ pub(crate) struct Bounding {
     pub min_y: f64,
     pub max_x: f64,
     pub max_y: f64,
+    pub center_x: f64,
+    pub center_y: f64,
 }
 impl Bounding {
     pub fn dx(&self) -> f64 {
@@ -32,14 +34,13 @@ impl Bounding {
 }
 
 pub(crate) struct MapData {
-    bounding: Bounding,
+    pub bounding: Bounding,
     pub osm_data: Osm,
-    scaling: f64,
 }
 
 impl MapData {
-    pub fn new(osm_data: Osm, scaling_factor: f64) -> Self {
-        let bounding = osm_data
+    pub fn new(osm_data: Osm) -> Self {
+        let mut bounding = osm_data
             .nodes
             .values()
             .fold(None::<Bounding>, |bounding, node| {
@@ -49,6 +50,8 @@ impl MapData {
                         min_y: bounding.min_y.min(node.y),
                         max_x: bounding.max_x.max(node.x),
                         max_y: bounding.max_y.max(node.y),
+                        center_x: 0.0,
+                        center_y: 0.0,
                     }
                 } else {
                     Bounding {
@@ -56,26 +59,25 @@ impl MapData {
                         min_y: node.y,
                         max_x: node.x,
                         max_y: node.y,
+                        center_x: 0.0,
+                        center_y: 0.0,
                     }
                 })
             })
             .unwrap()
             .equalise();
 
-        let scaling = scaling_factor / f64::max(bounding.dx(), bounding.dy());
+        bounding.center_x = (bounding.min_x + bounding.max_x) / 2.0;
+        bounding.center_y = (bounding.min_y + bounding.max_y) / 2.0;
 
-        Self {
-            bounding,
-            osm_data,
-            scaling,
-        }
+        Self { bounding, osm_data }
     }
 
-    pub fn scale(&self, p: Point) -> Point {
-        // TODO: Fix up mismatched types
-        let x = (p.x as f64 - self.bounding.min_x - (self.bounding.dx() / 2.0)) * self.scaling;
-        let y = (p.y as f64 - self.bounding.min_y - (self.bounding.dy() / 2.0)) * self.scaling;
-
-        Point::new(x as f32, y as f32)
+    pub fn translate(&self, point: Point) -> Point {
+        // Translate data back to center
+        Point::new(
+            point.x - (self.bounding.center_x as f32),
+            point.y - (self.bounding.center_y as f32),
+        )
     }
 }

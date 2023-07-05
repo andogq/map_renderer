@@ -35,7 +35,8 @@ impl Plugin<()> for MapCanvas {
                     .nodes
                     .iter()
                     .filter_map(|node_id| map_data.osm_data.nodes.get(node_id))
-                    .map(|node| map_data.scale(Point::new(node.x as f32, node.y as f32)))
+                    .map(|node| Point::new(node.x as f32, node.y as f32))
+                    .map(|node| map_data.translate(node))
                     .collect::<Vec<_>>();
 
                 for path in way_type.get_paths(&points) {
@@ -60,8 +61,8 @@ impl Plugin<()> for MapCanvas {
                 Path::new(
                     [
                         Vec3::new(0.0, 0.0, 0.0),
-                        Vec3::new(1.0, 0.0, 0.0),
-                        Vec3::new(0.0, 0.0, 1.0),
+                        Vec3::new(20.0, 0.0, 0.0),
+                        Vec3::new(0.0, 0.0, 20.0),
                         Vec3::new(0.0, 0.0, 0.0),
                     ]
                     .into_iter()
