@@ -264,8 +264,7 @@ impl RenderStep for CanvasProgram {
                         {
                             [stroke.is_some(), fill.is_some()]
                                 .into_iter()
-                                .enumerate()
-                                .fold(0u32, |packed, (i, value)| (packed << 1) | (value as u32))
+                                .fold(0u32, |packed, value| (packed << 1) | (value as u32))
                                 .to_ne_bytes()
                                 .as_slice()
                         },

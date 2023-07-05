@@ -9,7 +9,7 @@ edition = "2021"
 clap = { version = "4.1.8", features = ["derive"] }
 osmpbf = "0.3.0"
 renderer = { path = "./renderer/" }
-glam = "0.23.0"
+glam = "0.24.1"
 
 [workspace]
 members = ["renderer", "opengl"]

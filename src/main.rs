@@ -11,15 +11,10 @@ use clap::Parser;
 use glam::Vec3;
 use map_canvas::MapCanvas;
 use map_data::MapData;
-use osm::{Node, Osm};
+use osm::Osm;
 use osmpbf::ElementReader;
-use path_finder::PathFinder;
 use plugin::Plugin;
-use renderer::{
-    render_steps::canvas::{point_in_triangle, CanvasProgram, Path, Stroke},
-    window::Window,
-    Renderer,
-};
+use renderer::{window::Window, Renderer};
 
 #[derive(Parser)]
 struct Args {
@@ -29,17 +24,6 @@ struct Args {
     /// Minimum window size
     #[arg(long, default_value_t = 500)]
     size: usize,
-}
-
-enum ZoomDirection {
-    In,
-    Out,
-}
-enum PanDirection {
-    Left,
-    Right,
-    Up,
-    Down,
 }
 
 #[derive(Clone, Copy)]

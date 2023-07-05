@@ -4,7 +4,7 @@ use crate::ogl::OpenGl;
 use glutin::{
     config::ConfigTemplateBuilder,
     context::{ContextAttributesBuilder, PossiblyCurrentContext},
-    display::{Display, GetGlDisplay},
+    display::GetGlDisplay,
     prelude::{GlConfig, GlDisplay, NotCurrentGlContextSurfaceAccessor},
     surface::{GlSurface, Surface, WindowSurface},
 };
@@ -110,7 +110,6 @@ impl TryFrom<winit::event::WindowEvent<'_>> for WindowEvent {
 pub struct Window {
     event_loop: Option<EventLoop<()>>,
     window: winit::window::Window,
-    display: Display,
     gl_surface: Surface<WindowSurface>,
     gl_context: PossiblyCurrentContext,
     pub gl: OpenGl,
@@ -182,7 +181,6 @@ impl Window {
         Self {
             event_loop: Some(event_loop),
             window,
-            display,
             gl_surface,
             gl_context,
             gl: OpenGl::new(context),

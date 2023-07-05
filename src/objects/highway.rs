@@ -55,23 +55,22 @@ impl Object for Highway {
                     Self::Footway | Self::Path => Vec3::new(250.0, 164.0, 156.0) / 255.0,
                     _ => Vec3::new(169.0, 175.0, 182.0) / 255.0,
                 };
-                let dash = match self {
-                    Self::Footway | Self::Path => Some(0.05),
-                    Self::Motorway
-                    | Self::Trunk
-                    | Self::Primary
-                    | Self::Secondary
-                    | Self::Tertiary => Some(0.1),
-                    _ => None,
-                };
 
-                let mut stroke = Stroke::new(width, color);
-
+                // let dash = match self {
+                //     Self::Footway | Self::Path => Some(0.05),
+                //     Self::Motorway
+                //     | Self::Trunk
+                //     | Self::Primary
+                //     | Self::Secondary
+                //     | Self::Tertiary => Some(0.1),
+                //     _ => None,
+                // };
+                //
                 // if let Some(dash) = dash {
                 //     stroke = stroke.with_dash(dash);
                 // }
 
-                stroke
+                Stroke::new(width, color)
             }),
         ]
     }

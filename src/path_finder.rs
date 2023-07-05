@@ -7,10 +7,12 @@ use renderer::{
     RenderStep,
 };
 
+#[allow(unused)]
 pub(crate) struct Network {
     intersections: HashMap<i64, HashSet<i64>>,
 }
 
+#[allow(unused)]
 impl Network {
     pub fn new(data: &Osm) -> Self {
         let route_ways = data
@@ -65,11 +67,13 @@ impl Network {
     }
 }
 
+#[allow(unused)]
 pub(crate) struct PathFinder {
     start: Vec3,
     points: Vec<Vec3>,
 }
 
+#[allow(unused)]
 impl PathFinder {
     pub fn new(osm_data: &Osm, bounding: &Bounding) -> Self {
         let network = Network::new(osm_data);

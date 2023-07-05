@@ -53,7 +53,7 @@ impl Plugin<()> for MapCanvas {
         Rc::clone(&self.canvas) as Rc<RefCell<dyn RenderStep>>
     }
 
-    fn handle_event(&mut self, app_state: (), event: Event) -> bool {
+    fn handle_event(&mut self, _app_state: (), event: Event) -> bool {
         let mut canvas = self.canvas.borrow_mut();
 
         if let Event::Click(point) = event {
