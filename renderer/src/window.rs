@@ -21,7 +21,7 @@ use winit::{
     window::WindowBuilder,
 };
 
-const FRAME_TARGET: usize = 60;
+const FRAME_TARGET: usize = 120;
 
 pub enum WindowAction {
     Close,
