@@ -12,5 +12,4 @@ renderer = { path = "./renderer/" }
 glam = "0.24.1"
 
 [workspace]
-members = ["renderer", "opengl"]
-
+members = ["renderer", "opengl", "wgpu-renderer"]
